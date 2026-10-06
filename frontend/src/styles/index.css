@@ -1,0 +1,9 @@
+/* index.css — the ONLY stylesheet imported by the app.
+   Load order is fixed: tokens → base → components → utilities → print
+   (design.md §89). Individual components must not ship their own CSS. */
+
+@import "./tokens.css";
+@import "./base.css";
+@import "./components.css";
+@import "./utilities.css";
+@import "./print.css";

@@ -1,0 +1,46 @@
+/* print.css — keeps printed output clean (SRS §29.5 "easy to print"). */
+
+@media print {
+  .hs-header,
+  .hs-footer,
+  .hs-drawer,
+  .hs-page-head__actions,
+  .hs-filter-bar,
+  .hs-pagination,
+  .hs-no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  .hs-main {
+    padding: 0;
+    max-width: none;
+  }
+
+  .hs-card,
+  .hs-table-wrap {
+    border-color: #999;
+    box-shadow: none;
+    break-inside: avoid;
+  }
+
+  .hs-table th,
+  .hs-table td {
+    padding: 6pt 8pt;
+    border-bottom: 1px solid #bbb;
+  }
+
+  .hs-table-wrap {
+    overflow: visible;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}

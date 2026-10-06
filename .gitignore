@@ -1,0 +1,39 @@
+# Dependencies / frontend build
+node_modules/
+frontend/dist/
+frontend/package.json.md5
+
+# Compiled binaries
+build/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Legacy reference codebase
+FD_Management/
+
+# GitNexus index/caches
+.gitnexus/
+
+# Regenerable sample DB (go run ./tools/dummydb)
+testdata/*.db
+
+# Agent tooling (local)
+.claude/
+opencode.json
+
+# Logs
+$log/
+*.log
+
+# OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
