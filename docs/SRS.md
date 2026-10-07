@@ -583,10 +583,33 @@ Maturity Amount:
 
 Available actions:
 
+- Edit
 - Renew
 - Close
 
 The user shall also be able to view the FD history.
+
+---
+
+## 19.1 Editing an FD
+
+The software shall allow an active FD to be edited after it has been created.
+
+Editable fields: customer name, customer number, deposit amount, start date
+and tenure. The FD number, status, closure information and history shall never
+be editable.
+
+On save, the interest rate, interest and maturity amount shall be recalculated
+using the same calculation rules as creation, and an `EDIT` event shall be
+recorded in the FD history with the date and the new principal amount.
+
+Validation shall match creation (name required, positive amount, valid dates,
+tenure of at least one day). Like creation, the start date may be in the
+future.
+
+Only active FDs may be edited. Editing a closed FD shall be rejected with an
+error. An FD that is past its maturity date but still open (active) remains
+editable until it is closed.
 
 ---
 
@@ -652,6 +675,17 @@ A renewal shall create a new FD number.
 
 The previous FD shall remain available in history.
 
+The renewal start date shall be on or after the previous FD's maturity date.
+Renewals starting before maturity shall be rejected; back-dated renewals on or
+after the maturity date are allowed. The default start date is the maturity
+date.
+
+Independently of the chosen start date, the renewal action itself shall only
+be available on or after the maturity date: while today's date is before the
+maturity date, renewal shall be rejected with an error stating that renewal
+becomes available on the maturity date. This prevents future-dated renewals
+from being submitted early.
+
 ---
 
 # 22. Renewal Link
@@ -670,6 +704,16 @@ FD-27-015
 
 The user should be able to identify the previous and renewed FD.
 
+## 22.1 Reversing a renewal
+
+A renewal submitted by mistake shall be reversible while the renewed FD is
+still active (not closed or renewed again). The reversal withdraws the renewed
+FD with its history and reopens the previous FD, and shall require a reason
+that is recorded in the previous FD's history as a `REVERSE` event.
+
+If the renewed FD has already been closed or renewed, the reversal shall be
+blocked.
+
 ---
 
 # 23. FD Closure
@@ -679,7 +723,8 @@ An active FD may be closed.
 The closure screen shall require:
 
 - Closure Date
-- Closure Remark
+- Closure Remark (mandatory for premature closures; optional for closures at
+  or after maturity)
 
 The system shall automatically calculate the payable amount.
 
@@ -687,6 +732,16 @@ Two basic closure situations shall be supported:
 
 1. Premature closure
 2. Closure at/after maturity
+
+## 23.1 Reopening a closed FD
+
+A closed FD (matured or premature) shall be reopenable when the closure was
+submitted by mistake. Reopening requires a reason, returns the FD to `ACTIVE`,
+clears the closure fields, and appends a `REOPEN` event to the history — the
+original closure events are never deleted.
+
+FDs closed by renewal cannot be reopened directly; they must be reversed per
+§22.1.
 
 ---
 
@@ -767,7 +822,7 @@ unless another business rule is introduced in a future version.
 The system shall:
 
 - Require closure date
-- Require closure remark
+- Require a closure remark for premature closures
 - Prevent closure before the FD start date
 - Prevent closing an already closed FD
 - Calculate actual days held for premature closure

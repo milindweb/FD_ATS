@@ -172,6 +172,53 @@ func (r *FDRepo) Update(fd domain.FixedDeposit) error {
 	return nil
 }
 
+// ReverseRenewal atomically withdraws the renewed FD together with its
+// history rows and reopens the previous FD, appending the audit entry.
+func (r *FDRepo) ReverseRenewal(reopened domain.FixedDeposit, withdrawnFDNumber string, entry domain.HistoryEntry) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec("DELETE FROM fd_history WHERE fd_number = ?", withdrawnFDNumber); err != nil {
+		return err
+	}
+	res, err := tx.Exec("DELETE FROM fds WHERE fd_number = ?", withdrawnFDNumber)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return domain.ErrFDNotFound
+	}
+
+	if _, err := tx.Exec(`UPDATE fds SET
+		customer_name = ?, customer_number = ?, principal = ?, start_date = ?, tenure_days = ?,
+		interest_rate = ?, maturity_date = ?, interest_amount = ?, maturity_amount = ?, status = ?,
+		closure_date = ?, closure_type = ?, closure_remark = ?, closure_rate = ?, closure_days = ?,
+		closure_interest = ?, closure_payable = ?, renewed_from = ?, renewed_to = ?, updated_at = ?
+		WHERE fd_number = ?`,
+		reopened.CustomerName, reopened.CustomerNumber, reopened.Principal, reopened.StartDate, reopened.TenureDays,
+		reopened.InterestRate, reopened.MaturityDate, reopened.InterestAmount, reopened.MaturityAmount, reopened.Status,
+		reopened.ClosureDate, reopened.ClosureType, reopened.ClosureRemark, reopened.ClosureRate, reopened.ClosureDays,
+		reopened.ClosureInterest, reopened.ClosurePayable, reopened.RenewedFrom, reopened.RenewedTo, reopened.UpdatedAt,
+		reopened.FDNumber,
+	); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(
+		`INSERT INTO fd_history(fd_number, event_date, event_type, amount, interest, reference_fd, remarks, created_at)
+		 VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+		entry.FDNumber, entry.EventDate, entry.EventType, entry.Amount, entry.Interest,
+		nullStr(entry.ReferenceFD), entry.Remarks, entry.CreatedAt,
+	); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // ListParams filters and pages the FD list (SRS §9.2).
 type ListParams struct {
 	Search   string

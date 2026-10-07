@@ -49,7 +49,7 @@ export function ClosePage() {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [fd, closureDate]);
+  }, [fd, closureDate, remark]);
 
   if (detail.loading) return <Loading />;
   if (detail.error || !fd) return <ErrorState message={detail.error || "Fixed Deposit not found."} onRetry={detail.reload} />;
@@ -66,6 +66,9 @@ export function ClosePage() {
       </>
     );
   }
+
+  const remarkNeeded = preview?.isPremature === true;
+  const remarkMissing = remarkNeeded && remark.trim() === "";
 
   const confirmClose = async () => {
     setConfirming(false);
@@ -124,8 +127,14 @@ export function ClosePage() {
                 />
               </FormField>
 
-              <FormField label="Remark" hint="Optional reason recorded in the history" htmlFor="close-remark">
-                <Textarea id="close-remark" rows={3} value={remark} onChange={(e) => setRemark(e.target.value)} />
+              <FormField
+                label="Remark"
+                required={remarkNeeded}
+                error={remarkMissing ? "Please enter a closure remark." : null}
+                hint="Reason recorded in the FD history"
+                htmlFor="close-remark"
+              >
+                <Textarea id="close-remark" rows={3} value={remark} onChange={(e) => setRemark(e.target.value)} invalid={remarkMissing} />
               </FormField>
             </div>
           </CardBody>
@@ -167,7 +176,7 @@ export function ClosePage() {
                   </p>
                 )}
                 <div className="u-mt-4">
-                  <Button variant="danger" size="lg" block onClick={() => setConfirming(true)} loading={saving}>
+                  <Button variant="danger" size="lg" block onClick={() => setConfirming(true)} loading={saving} disabled={remarkMissing}>
                     Close FD
                   </Button>
                 </div>

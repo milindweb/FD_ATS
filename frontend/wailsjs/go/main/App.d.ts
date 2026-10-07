@@ -16,6 +16,8 @@ export function CreateFD(arg1:api.PreviewRequest):Promise<api.FD>;
 
 export function DashboardStats():Promise<api.DashboardStats>;
 
+export function EditFD(arg1:api.EditFDRequest):Promise<api.FD>;
+
 export function ExportReport(arg1:api.ReportRequest):Promise<api.ReportResult>;
 
 export function GetAuthInfo():Promise<api.AuthInfo>;
@@ -48,9 +50,13 @@ export function PreviewReport(arg1:api.ReportRequest):Promise<api.ReportPreview>
 
 export function RenewFD(arg1:api.RenewRequest):Promise<api.RenewResult>;
 
+export function ReopenFD(arg1:api.ReopenRequest):Promise<api.FD>;
+
 export function ResetCredentials(arg1:api.ResetCredentialsRequest):Promise<api.AuthInfo>;
 
 export function RestoreDatabase(arg1:string):Promise<void>;
+
+export function ReverseRenewal(arg1:api.ReverseRenewalRequest):Promise<api.FD>;
 
 export function SaveRateSlabs(arg1:api.SaveSlabsRequest):Promise<void>;
 

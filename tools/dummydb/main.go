@@ -110,7 +110,6 @@ func main() {
 		if _, err := svc.Renew(api.RenewRequest{
 			FDNumber:   created[num].FDNumber,
 			Mode:       domain.RenewPrincipalPlusInterest,
-			StartDate:  today,
 			TenureDays: 730,
 			Remark:     "Renewed for another two years",
 		}); err != nil {

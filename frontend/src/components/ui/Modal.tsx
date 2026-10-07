@@ -51,6 +51,7 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -63,6 +64,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   danger,
   busy,
+  confirmDisabled,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -76,7 +78,7 @@ export function ConfirmDialog({
           <Button onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} loading={busy}>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} loading={busy} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </>

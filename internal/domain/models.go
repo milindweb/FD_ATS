@@ -21,14 +21,17 @@ const (
 type HistoryEventType string
 
 const (
-	EventOpen  HistoryEventType = "OPEN"
-	EventRenew HistoryEventType = "RENEW"
-	EventClose HistoryEventType = "CLOSE"
+	EventOpen    HistoryEventType = "OPEN"
+	EventRenew   HistoryEventType = "RENEW"
+	EventClose   HistoryEventType = "CLOSE"
+	EventReopen  HistoryEventType = "REOPEN"
+	EventReverse HistoryEventType = "REVERSE"
+	EventEdit    HistoryEventType = "EDIT"
 )
 
 // Renewal modes (SRS §21).
 const (
-	RenewPrincipalOnly        = "PRINCIPAL_ONLY"
+	RenewPrincipalOnly         = "PRINCIPAL_ONLY"
 	RenewPrincipalPlusInterest = "PRINCIPAL_PLUS_INTEREST"
 )
 
@@ -43,28 +46,28 @@ const (
 // FixedDeposit is the FD master record (SRS §12).
 // Monetary values are whole rupees; dates are ISO YYYY-MM-DD strings.
 type FixedDeposit struct {
-	FDNumber       string
-	CustomerName   string
-	CustomerNumber string
-	Principal      int64
-	StartDate      string
-	TenureDays     int
-	InterestRate   float64
-	MaturityDate   string
-	InterestAmount int64
-	MaturityAmount int64
-	Status         FDStatus
-	ClosureDate    *string
-	ClosureType    *ClosureType
-	ClosureRemark  string
-	ClosureRate    *float64
-	ClosureDays    *int
+	FDNumber        string
+	CustomerName    string
+	CustomerNumber  string
+	Principal       int64
+	StartDate       string
+	TenureDays      int
+	InterestRate    float64
+	MaturityDate    string
+	InterestAmount  int64
+	MaturityAmount  int64
+	Status          FDStatus
+	ClosureDate     *string
+	ClosureType     *ClosureType
+	ClosureRemark   string
+	ClosureRate     *float64
+	ClosureDays     *int
 	ClosureInterest *int64
 	ClosurePayable  *int64
-	RenewedFrom    *string
-	RenewedTo      *string
-	CreatedAt      string
-	UpdatedAt      string
+	RenewedFrom     *string
+	RenewedTo       *string
+	CreatedAt       string
+	UpdatedAt       string
 }
 
 // HistoryEntry is one chronological event recorded for an FD (SRS §20).

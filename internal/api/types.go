@@ -14,6 +14,17 @@ type PreviewRequest struct {
 	TenureDays     int    `json:"tenureDays"`
 }
 
+// EditFDRequest updates the editable fields of an existing ACTIVE FD;
+// derived amounts are recomputed by the service.
+type EditFDRequest struct {
+	FDNumber       string `json:"fdNumber"`
+	CustomerName   string `json:"customerName"`
+	CustomerNumber string `json:"customerNumber"`
+	Principal      int64  `json:"principal"`
+	StartDate      string `json:"startDate"`
+	TenureDays     int    `json:"tenureDays"`
+}
+
 // Calculation is a full interest/maturity calculation result (SRS §10).
 type Calculation struct {
 	Principal      int64   `json:"principal"`
@@ -125,6 +136,19 @@ type CloseRequest struct {
 	FDNumber    string `json:"fdNumber"`
 	ClosureDate string `json:"closureDate"`
 	Remark      string `json:"remark"`
+}
+
+// ReopenRequest returns a closed FD to ACTIVE status; the remark is the
+// mandatory audit reason for the reversal.
+type ReopenRequest struct {
+	FDNumber string `json:"fdNumber"`
+	Remark   string `json:"remark"`
+}
+
+// ReverseRenewalRequest withdraws the renewed FD and reopens the previous one.
+type ReverseRenewalRequest struct {
+	FDNumber string `json:"fdNumber"`
+	Remark   string `json:"remark"`
 }
 
 // ClosurePreview shows the payable amount before confirmation (SRS §26).

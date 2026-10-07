@@ -130,6 +130,28 @@ export namespace api {
 	        this.maturing90 = source["maturing90"];
 	    }
 	}
+	export class EditFDRequest {
+	    fdNumber: string;
+	    customerName: string;
+	    customerNumber: string;
+	    principal: number;
+	    startDate: string;
+	    tenureDays: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EditFDRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fdNumber = source["fdNumber"];
+	        this.customerName = source["customerName"];
+	        this.customerNumber = source["customerNumber"];
+	        this.principal = source["principal"];
+	        this.startDate = source["startDate"];
+	        this.tenureDays = source["tenureDays"];
+	    }
+	}
 	export class FD {
 	    fdNumber: string;
 	    customerName: string;
@@ -374,6 +396,20 @@ export namespace api {
 		    return a;
 		}
 	}
+	export class ReopenRequest {
+	    fdNumber: string;
+	    remark: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReopenRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fdNumber = source["fdNumber"];
+	        this.remark = source["remark"];
+	    }
+	}
 	export class ReportPreview {
 	    kind: string;
 	    headers: string[];
@@ -438,6 +474,20 @@ export namespace api {
 	        this.recoveryCode = source["recoveryCode"];
 	        this.newUsername = source["newUsername"];
 	        this.newPassword = source["newPassword"];
+	    }
+	}
+	export class ReverseRenewalRequest {
+	    fdNumber: string;
+	    remark: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReverseRenewalRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fdNumber = source["fdNumber"];
+	        this.remark = source["remark"];
 	    }
 	}
 	export class SaveSlabsRequest {

@@ -4,7 +4,7 @@ package brand
 
 const (
 	Product        = "Fixed Deposit Management"
-	Version        = "1.0.0"
+	Version        = "1.1.0"
 	Developer      = "Aarti Tech Services"
 	Services       = "FULL STACK DEVELOPMENT, SEO DIGITAL MARKETING, ENGINEERING SOLUTIONS"
 	Website        = "https://aartitechservices.pages.dev/"

@@ -9,6 +9,7 @@ import {
   CloseFD,
   CreateFD,
   DashboardStats,
+  EditFD,
   ExportReport,
   GetAuthInfo,
   GetFD,
@@ -25,8 +26,10 @@ import {
   PreviewFD,
   PreviewReport,
   RenewFD,
+  ReopenFD,
   ResetCredentials,
   RestoreDatabase,
+  ReverseRenewal,
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,
@@ -38,13 +41,16 @@ export type Calculation = api.Calculation;
 export type CloseRequest = api.CloseRequest;
 export type ClosurePreview = api.ClosurePreview;
 export type DashboardStats = api.DashboardStats;
+export type EditFDRequest = api.EditFDRequest;
 export type FD = api.FD;
 export type FDDetail = api.FDDetail;
 export type ListRequest = api.ListRequest;
 export type ListResponse = api.ListResponse;
 export type PreviewRequest = api.PreviewRequest;
+export type ReopenRequest = api.ReopenRequest;
 export type RenewRequest = api.RenewRequest;
 export type RenewResult = api.RenewResult;
+export type ReverseRenewalRequest = api.ReverseRenewalRequest;
 export type ReportRequest = api.ReportRequest;
 export type ReportResult = api.ReportResult;
 export type ReportPreview = api.ReportPreview;
@@ -67,6 +73,7 @@ export {
   CloseFD,
   CreateFD,
   DashboardStats,
+  EditFD,
   ExportReport,
   GetAuthInfo,
   GetFD,
@@ -83,8 +90,10 @@ export {
   PreviewFD,
   PreviewReport,
   RenewFD,
+  ReopenFD,
   ResetCredentials,
   RestoreDatabase,
+  ReverseRenewal,
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,

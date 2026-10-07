@@ -43,6 +43,14 @@ func baseRequest() api.PreviewRequest {
 	}
 }
 
+// maturedRequest is baseRequest shifted back one year: start 2025-10-01,
+// matures 2026-10-01 — five days before fixedNow, so renewals are allowed.
+func maturedRequest() api.PreviewRequest {
+	req := baseRequest()
+	req.StartDate = "2025-10-01"
+	return req
+}
+
 func TestPreviewMatchesSRSExample(t *testing.T) {
 	svc := newTestService(t)
 
@@ -148,6 +156,134 @@ func TestCreateValidationMessages(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEditFDUpdatesActiveFD(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	edited, err := svc.EditFD(api.EditFDRequest{
+		FDNumber:       created.FDNumber,
+		CustomerName:   "Renamed Member",
+		CustomerNumber: "CUST-999",
+		Principal:      200000,
+		StartDate:      "2026-10-01",
+		TenureDays:     365,
+	})
+	if err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	if edited.CustomerName != "Renamed Member" || edited.CustomerNumber != "CUST-999" {
+		t.Errorf("identity=%s/%s, want Renamed Member/CUST-999", edited.CustomerName, edited.CustomerNumber)
+	}
+	if edited.Principal != 200000 || edited.InterestAmount != 16000 || edited.MaturityAmount != 216000 {
+		t.Errorf("amounts p=%d i=%d m=%d, want 200000/16000/216000",
+			edited.Principal, edited.InterestAmount, edited.MaturityAmount)
+	}
+	if edited.Status != domain.StatusActive {
+		t.Errorf("status=%s, want ACTIVE", edited.Status)
+	}
+
+	detail, err := svc.Get(created.FDNumber)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(detail.History) != 2 {
+		t.Fatalf("history=%d entries, want 2 (OPEN + EDIT)", len(detail.History))
+	}
+	last := detail.History[1]
+	if last.EventType != domain.EventEdit || last.Remarks != "FD details edited" {
+		t.Errorf("last history=%+v, want EDIT \"FD details edited\"", last)
+	}
+}
+
+func TestEditFDBlockedOnClosedFD(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(maturedRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Close(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-01"}); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	_, err = svc.EditFD(api.EditFDRequest{
+		FDNumber: created.FDNumber, CustomerName: "X", CustomerNumber: "Y",
+		Principal: 1, StartDate: "2026-10-01", TenureDays: 1,
+	})
+	if !errors.Is(err, domain.ErrEditClosed) {
+		t.Errorf("err=%v, want ErrEditClosed", err)
+	}
+}
+
+func TestEditFDValidation(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	base := func() api.EditFDRequest {
+		return api.EditFDRequest{
+			FDNumber: created.FDNumber, CustomerName: "ABC", CustomerNumber: "C-1",
+			Principal: 100000, StartDate: "2026-10-01", TenureDays: 365,
+		}
+	}
+
+	t.Run("unknown fd", func(t *testing.T) {
+		req := base()
+		req.FDNumber = "FD-99-999"
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrFDNotFound) {
+			t.Errorf("err=%v, want ErrFDNotFound", err)
+		}
+	})
+
+	t.Run("name required", func(t *testing.T) {
+		req := base()
+		req.CustomerName = "  "
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrCustomerNameRequired) {
+			t.Errorf("err=%v, want ErrCustomerNameRequired", err)
+		}
+	})
+
+	t.Run("number required", func(t *testing.T) {
+		req := base()
+		req.CustomerNumber = ""
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrCustomerNumberRequired) {
+			t.Errorf("err=%v, want ErrCustomerNumberRequired", err)
+		}
+	})
+
+	t.Run("amount", func(t *testing.T) {
+		req := base()
+		req.Principal = 0
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrInvalidAmount) {
+			t.Errorf("err=%v, want ErrInvalidAmount", err)
+		}
+	})
+
+	t.Run("bad date", func(t *testing.T) {
+		req := base()
+		req.StartDate = "not-a-date"
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrInvalidDate) {
+			t.Errorf("err=%v, want ErrInvalidDate", err)
+		}
+	})
+
+	t.Run("tenure", func(t *testing.T) {
+		req := base()
+		req.TenureDays = 0
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrInvalidTenure) {
+			t.Errorf("err=%v, want ErrInvalidTenure", err)
+		}
+	})
 }
 
 func TestListSearchAndFilters(t *testing.T) {
@@ -338,7 +474,7 @@ func TestUpcomingMaturities(t *testing.T) {
 func TestRenewPrincipalOnly(t *testing.T) {
 	svc := newTestService(t)
 
-	created, err := svc.Create(baseRequest())
+	created, err := svc.Create(maturedRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,11 +508,11 @@ func TestRenewPrincipalOnly(t *testing.T) {
 	}
 
 	// New FD starts at the old maturity date by default (SRS §22).
-	if res.NewFD.StartDate != "2027-10-01" {
-		t.Errorf("new start=%s, want 2027-10-01", res.NewFD.StartDate)
+	if res.NewFD.StartDate != "2026-10-01" {
+		t.Errorf("new start=%s, want 2026-10-01", res.NewFD.StartDate)
 	}
-	if res.NewFD.FDNumber != "FD-27-001" {
-		t.Errorf("new number=%s, want FD-27-001", res.NewFD.FDNumber)
+	if res.NewFD.FDNumber != "FD-26-001" {
+		t.Errorf("new number=%s, want FD-26-001", res.NewFD.FDNumber)
 	}
 
 	// History of the old FD contains OPEN + RENEW.
@@ -395,7 +531,7 @@ func TestRenewPrincipalOnly(t *testing.T) {
 func TestRenewPrincipalPlusInterest(t *testing.T) {
 	svc := newTestService(t)
 
-	created, err := svc.Create(baseRequest())
+	created, err := svc.Create(maturedRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +555,7 @@ func TestRenewPrincipalPlusInterest(t *testing.T) {
 func TestRenewValidation(t *testing.T) {
 	svc := newTestService(t)
 
-	created, err := svc.Create(baseRequest())
+	created, err := svc.Create(maturedRequest())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +584,7 @@ func TestRenewValidation(t *testing.T) {
 	t.Run("start before fd start", func(t *testing.T) {
 		_, err := svc.Renew(api.RenewRequest{
 			FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
-			StartDate: "2026-01-01", TenureDays: 365,
+			StartDate: "2025-05-01", TenureDays: 365,
 		})
 		if !errors.Is(err, domain.ErrClosureBeforeStart) {
 			t.Errorf("err=%v, want ErrClosureBeforeStart", err)
@@ -465,6 +601,107 @@ func TestRenewValidation(t *testing.T) {
 			t.Errorf("err=%v, want ErrClosedCannotRenew", err)
 		}
 	})
+}
+
+func TestRenewBeforeMaturityBlocked(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(maturedRequest()) // start 2025-10-01, matures 2026-10-01
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.Renew(api.RenewRequest{
+		FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
+		StartDate: "2026-09-30", TenureDays: 365,
+	})
+	if !errors.Is(err, domain.ErrRenewBeforeMaturity) {
+		t.Errorf("err=%v, want ErrRenewBeforeMaturity", err)
+	}
+
+	if _, err := svc.Get(created.FDNumber); err != nil {
+		t.Fatalf("fd must stay active after rejected renewal: %v", err)
+	}
+}
+
+func TestRenewOnOrAfterMaturityAllowed(t *testing.T) {
+	svc := newTestService(t)
+
+	for _, start := range []string{"2026-10-01", "2026-12-01"} {
+		t.Run("start "+start, func(t *testing.T) {
+			created, err := svc.Create(maturedRequest()) // matures 2026-10-01
+			if err != nil {
+				t.Fatal(err)
+			}
+			res, err := svc.Renew(api.RenewRequest{
+				FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
+				StartDate: start, TenureDays: 365,
+			})
+			if err != nil {
+				t.Fatalf("renew at %s: %v", start, err)
+			}
+			if res.NewFD.StartDate != start {
+				t.Errorf("new start=%s, want %s", res.NewFD.StartDate, start)
+			}
+			if res.PreviousFD.Status != domain.StatusClosed {
+				t.Errorf("previous status=%s, want CLOSED", res.PreviousFD.Status)
+			}
+		})
+	}
+}
+
+func TestRenewBackdatedOnMaturityAllowed(t *testing.T) {
+	svc := newTestService(t)
+
+	req := baseRequest()
+	req.StartDate = "2025-01-01"
+	req.TenureDays = 365 // matures 2026-01-01, already past
+	created, err := svc.Create(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.Renew(api.RenewRequest{
+		FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
+		StartDate: "2025-12-30", TenureDays: 365,
+	})
+	if !errors.Is(err, domain.ErrRenewBeforeMaturity) {
+		t.Errorf("start after fd start but before maturity err=%v, want ErrRenewBeforeMaturity", err)
+	}
+
+	res, err := svc.Renew(api.RenewRequest{
+		FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
+		StartDate: "2026-01-01", TenureDays: 365,
+	})
+	if err != nil {
+		t.Fatalf("back-dated renewal on maturity: %v", err)
+	}
+	if res.NewFD.StartDate != "2026-01-01" {
+		t.Errorf("new start=%s, want 2026-01-01", res.NewFD.StartDate)
+	}
+}
+
+func TestRenewBlockedUntilMaturity(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest()) // start 2026-10-01, matures 2027-10-01 (future)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Even with a valid start date on the maturity date, the renewal itself
+	// must not be possible before the maturity date has been reached.
+	_, err = svc.Renew(api.RenewRequest{
+		FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly,
+		StartDate: "2027-10-01", TenureDays: 365,
+	})
+	if !errors.Is(err, domain.ErrRenewNotMatured) {
+		t.Errorf("err=%v, want ErrRenewNotMatured", err)
+	}
+
+	if _, err := svc.Get(created.FDNumber); err != nil {
+		t.Fatalf("fd must stay active after rejected renewal: %v", err)
+	}
 }
 
 func TestClosePremature(t *testing.T) {
@@ -552,23 +789,29 @@ func TestCloseValidation(t *testing.T) {
 	}
 
 	cases := []struct {
-		name string
-		req  api.CloseRequest
-		want error
+		name        string
+		req         api.CloseRequest
+		want        error // Close expectation
+		previewWant error // PreviewClosure expectation; nil = preview must succeed
 	}{
-		{"missing date", api.CloseRequest{FDNumber: created.FDNumber, Remark: "x"}, domain.ErrClosureDateRequired},
-		{"bad date", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "not-a-date", Remark: "x"}, domain.ErrInvalidDate},
-		{"missing remark", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-05"}, domain.ErrClosureRemarkRequired},
-		{"before start", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-09-01", Remark: "x"}, domain.ErrClosureBeforeStart},
-		{"unknown fd", api.CloseRequest{FDNumber: "FD-99-999", ClosureDate: "2026-10-05", Remark: "x"}, domain.ErrFDNotFound},
+		{"missing date", api.CloseRequest{FDNumber: created.FDNumber, Remark: "x"}, domain.ErrClosureDateRequired, domain.ErrClosureDateRequired},
+		{"bad date", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "not-a-date", Remark: "x"}, domain.ErrInvalidDate, domain.ErrInvalidDate},
+		{"missing remark on premature close", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-05"}, domain.ErrClosureRemarkRequired, nil},
+		{"before start", api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-09-01", Remark: "x"}, domain.ErrClosureBeforeStart, domain.ErrClosureBeforeStart},
+		{"unknown fd", api.CloseRequest{FDNumber: "FD-99-999", ClosureDate: "2026-10-05", Remark: "x"}, domain.ErrFDNotFound, domain.ErrFDNotFound},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if _, err := svc.Close(c.req); !errors.Is(err, c.want) {
 				t.Errorf("close err=%v, want %v", err, c.want)
 			}
-			if _, err := svc.PreviewClosure(c.req); !errors.Is(err, c.want) {
-				t.Errorf("preview err=%v, want %v", err, c.want)
+			_, perr := svc.PreviewClosure(c.req)
+			if c.previewWant == nil {
+				if perr != nil {
+					t.Errorf("preview err=%v, want success (preview never requires a remark)", perr)
+				}
+			} else if !errors.Is(perr, c.previewWant) {
+				t.Errorf("preview err=%v, want %v", perr, c.previewWant)
 			}
 		})
 	}
@@ -584,6 +827,180 @@ func TestCloseValidation(t *testing.T) {
 	_, err = svc.Renew(api.RenewRequest{FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly, TenureDays: 365})
 	if !errors.Is(err, domain.ErrClosedCannotRenew) {
 		t.Errorf("renew closed err=%v, want ErrClosedCannotRenew", err)
+	}
+}
+
+func TestCloseMaturedWithoutRemark(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest()) // matures 2027-10-01
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A matured payout needs no remark: preview and close both succeed.
+	if _, err := svc.PreviewClosure(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2027-10-01"}); err != nil {
+		t.Errorf("preview without remark: %v, want success", err)
+	}
+	closed, err := svc.Close(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2027-10-01"})
+	if err != nil {
+		t.Fatalf("close matured without remark: %v, want success", err)
+	}
+	if closed.ClosureType == nil || *closed.ClosureType != domain.ClosureMatured {
+		t.Errorf("type=%v, want MATURED", closed.ClosureType)
+	}
+}
+
+func TestReopenClosedFD(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Reopen(api.ReopenRequest{FDNumber: created.FDNumber, Remark: "x"}); !errors.Is(err, domain.ErrNotClosed) {
+		t.Errorf("reopen active fd err=%v, want ErrNotClosed", err)
+	}
+
+	if _, err := svc.Close(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-05", Remark: "need money"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Reopen(api.ReopenRequest{FDNumber: created.FDNumber}); !errors.Is(err, domain.ErrReversalReasonRequired) {
+		t.Errorf("reopen without reason err=%v, want ErrReversalReasonRequired", err)
+	}
+
+	reopened, err := svc.Reopen(api.ReopenRequest{FDNumber: created.FDNumber, Remark: "wrong closure date"})
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	if reopened.Status != domain.StatusActive {
+		t.Errorf("status=%s, want ACTIVE", reopened.Status)
+	}
+	if reopened.ClosureDate != nil || reopened.ClosureType != nil || reopened.ClosurePayable != nil {
+		t.Errorf("closure fields not cleared: %+v", reopened)
+	}
+	if reopened.ClosureRemark != "" {
+		t.Errorf("closure remark=%q, want empty", reopened.ClosureRemark)
+	}
+
+	detail, err := svc.Get(created.FDNumber)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := detail.History[len(detail.History)-1]
+	if last.EventType != domain.EventReopen || last.Remarks != "wrong closure date" {
+		t.Errorf("last history=%+v, want REOPEN with reason", last)
+	}
+
+	if _, err := svc.Close(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-06", Remark: "second try"}); err != nil {
+		t.Errorf("close after reopen: %v", err)
+	}
+}
+
+func TestReopenRenewedFDBlocked(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(maturedRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := svc.Renew(api.RenewRequest{FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly, TenureDays: 365})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.Reopen(api.ReopenRequest{FDNumber: res.PreviousFD.FDNumber, Remark: "undo renewal"})
+	if !errors.Is(err, domain.ErrRenewedCannotReopen) {
+		t.Errorf("reopen renewed fd err=%v, want ErrRenewedCannotReopen", err)
+	}
+}
+
+func TestReverseRenewal(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(maturedRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := svc.Renew(api.RenewRequest{FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly, TenureDays: 365})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newNumber := res.NewFD.FDNumber
+
+	if _, err := svc.ReverseRenewal(api.ReverseRenewalRequest{FDNumber: res.PreviousFD.FDNumber}); !errors.Is(err, domain.ErrReversalReasonRequired) {
+		t.Errorf("reverse without reason err=%v, want ErrReversalReasonRequired", err)
+	}
+
+	old, err := svc.ReverseRenewal(api.ReverseRenewalRequest{FDNumber: res.PreviousFD.FDNumber, Remark: "renewed by mistake"})
+	if err != nil {
+		t.Fatalf("reverse renewal: %v", err)
+	}
+	if old.Status != domain.StatusActive {
+		t.Errorf("old status=%s, want ACTIVE", old.Status)
+	}
+	if old.ClosureType != nil || old.RenewedTo != nil {
+		t.Errorf("old closure/renewal links not cleared: %+v", old)
+	}
+
+	if _, err := svc.Get(newNumber); !errors.Is(err, domain.ErrFDNotFound) {
+		t.Errorf("withdrawn fd err=%v, want ErrFDNotFound", err)
+	}
+
+	detail, err := svc.Get(old.FDNumber)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := detail.History[len(detail.History)-1]
+	if last.EventType != domain.EventReverse || last.ReferenceFD != newNumber {
+		t.Errorf("last history=%+v, want REVERSE referencing %s", last, newNumber)
+	}
+
+	if _, err := svc.Renew(api.RenewRequest{FDNumber: old.FDNumber, Mode: domain.RenewPrincipalOnly, TenureDays: 365}); err != nil {
+		t.Errorf("renew after reversal: %v", err)
+	}
+}
+
+func TestReverseRenewalBlockedAfterNewFDUsed(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(maturedRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := svc.Renew(api.RenewRequest{FDNumber: created.FDNumber, Mode: domain.RenewPrincipalOnly, TenureDays: 365})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Close(api.CloseRequest{FDNumber: res.NewFD.FDNumber, ClosureDate: "2027-10-01", Remark: "paid out"}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = svc.ReverseRenewal(api.ReverseRenewalRequest{FDNumber: res.PreviousFD.FDNumber, Remark: "undo"})
+	if !errors.Is(err, domain.ErrRenewalAlreadyUsed) {
+		t.Errorf("err=%v, want ErrRenewalAlreadyUsed", err)
+	}
+}
+
+func TestReverseRenewalOnNonRenewedFDBlocked(t *testing.T) {
+	svc := newTestService(t)
+
+	created, err := svc.Create(baseRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.ReverseRenewal(api.ReverseRenewalRequest{FDNumber: created.FDNumber, Remark: "x"}); !errors.Is(err, domain.ErrNotRenewed) {
+		t.Errorf("active fd err=%v, want ErrNotRenewed", err)
+	}
+
+	if _, err := svc.Close(api.CloseRequest{FDNumber: created.FDNumber, ClosureDate: "2026-10-05", Remark: "need money"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ReverseRenewal(api.ReverseRenewalRequest{FDNumber: created.FDNumber, Remark: "x"}); !errors.Is(err, domain.ErrNotRenewed) {
+		t.Errorf("premature-closed fd err=%v, want ErrNotRenewed", err)
 	}
 }
 
@@ -712,7 +1129,7 @@ func TestRecommendedUserFlow(t *testing.T) {
 	}
 
 	// Create New FD → Enter Details → Calculate Preview → Confirm & Save
-	req := baseRequest()
+	req := maturedRequest()
 	preview, err := svc.Preview(req)
 	if err != nil {
 		t.Fatalf("preview: %v", err)

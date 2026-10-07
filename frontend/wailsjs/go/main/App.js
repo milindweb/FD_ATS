@@ -26,6 +26,10 @@ export function DashboardStats() {
   return window['go']['main']['App']['DashboardStats']();
 }
 
+export function EditFD(arg1) {
+  return window['go']['main']['App']['EditFD'](arg1);
+}
+
 export function ExportReport(arg1) {
   return window['go']['main']['App']['ExportReport'](arg1);
 }
@@ -90,12 +94,20 @@ export function RenewFD(arg1) {
   return window['go']['main']['App']['RenewFD'](arg1);
 }
 
+export function ReopenFD(arg1) {
+  return window['go']['main']['App']['ReopenFD'](arg1);
+}
+
 export function ResetCredentials(arg1) {
   return window['go']['main']['App']['ResetCredentials'](arg1);
 }
 
 export function RestoreDatabase(arg1) {
   return window['go']['main']['App']['RestoreDatabase'](arg1);
+}
+
+export function ReverseRenewal(arg1) {
+  return window['go']['main']['App']['ReverseRenewal'](arg1);
 }
 
 export function SaveRateSlabs(arg1) {

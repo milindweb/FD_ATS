@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { GetFD, errorMessage, type FDDetail } from "../lib/api";
+import { GetFD, ReopenFD, ReverseRenewal, errorMessage, type FDDetail } from "../lib/api";
 import { daysLabel, formatDate, formatMoney, formatPercent, formatTenure, todayISO } from "../lib/format";
 import { useAsync } from "../lib/hooks";
 import { Alert } from "../components/ui/Alert";
@@ -9,6 +9,8 @@ import { Button } from "../components/ui/Button";
 import { Card, CardBody, CardHead } from "../components/ui/Card";
 import { DataTable, type Column } from "../components/data/DataTable";
 import { ErrorState, Loading } from "../components/ui/States";
+import { FormField, Textarea } from "../components/ui/FormField";
+import { ConfirmDialog } from "../components/ui/Modal";
 import { PageHeader } from "../components/ui/PageHeader";
 import type { HistoryEntry } from "../lib/api";
 
@@ -33,7 +35,15 @@ export function FDDetailsPage() {
   const detail = useAsync(() => GetFD(fdNumber), [fdNumber]);
 
   const created = (location.state as { created?: boolean } | null)?.created === true;
+  const edited = (location.state as { edited?: boolean } | null)?.edited === true;
+  const reversed = (location.state as { reversed?: boolean } | null)?.reversed === true;
   const fd = detail.data?.fd;
+
+  const [reversal, setReversal] = useState<"reopen" | "reverse" | null>(null);
+  const [reason, setReason] = useState("");
+  const [reversing, setReversing] = useState(false);
+  const [reversalError, setReversalError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
 
   const historyColumns = useMemo<Array<Column<HistoryEntry>>>(
     () => [
@@ -52,6 +62,48 @@ export function FDDetailsPage() {
 
   const remaining = daysRemaining(fd.maturityDate);
   const isActive = fd.status === "ACTIVE";
+  const canReopen = !isActive && fd.closureType !== "RENEWED";
+  const canReverse = (!isActive && fd.closureType === "RENEWED" && !!fd.renewedTo) || (isActive && !!fd.renewedFrom);
+  const notMatured = isActive && todayISO() < fd.maturityDate;
+
+  const openReversal = (mode: "reopen" | "reverse") => {
+    setReversal(mode);
+    setReason("");
+    setReversalError(null);
+  };
+
+  const closeReversal = () => {
+    setReversal(null);
+    setReason("");
+    setReversalError(null);
+  };
+
+  const runReversal = async () => {
+    if (!reversal || !fd) return;
+    const trimmed = reason.trim();
+    if (!trimmed) return;
+    const targetFd = reversal === "reverse" && fd.renewedFrom ? fd.renewedFrom : fd.fdNumber;
+    setReversing(true);
+    setReversalError(null);
+    try {
+      if (reversal === "reopen") {
+        await ReopenFD({ fdNumber: fd.fdNumber, remark: trimmed });
+      } else {
+        await ReverseRenewal({ fdNumber: targetFd, remark: trimmed });
+      }
+      closeReversal();
+      setReversing(false);
+      if (targetFd === fd.fdNumber) {
+        setFlash(reversal === "reopen" ? "The FD is active again." : "Renewal reversed.");
+        detail.reload();
+      } else {
+        navigate(`/fd/${targetFd}`, { state: { reversed: true } });
+      }
+    } catch (err: unknown) {
+      setReversalError(errorMessage(err));
+      setReversing(false);
+    }
+  };
 
   return (
     <>
@@ -70,7 +122,14 @@ export function FDDetailsPage() {
             </Button>
             {isActive && (
               <>
-                <Button variant="primary" icon="refresh" onClick={() => navigate(`/fd/${fd.fdNumber}/renew`)}>
+                <Button onClick={() => navigate(`/fd/${fd.fdNumber}/edit`)}>Edit</Button>
+                <Button
+                  variant="primary"
+                  icon="refresh"
+                  disabled={notMatured}
+                  title={notMatured ? `Available from ${formatDate(fd.maturityDate)}` : undefined}
+                  onClick={() => navigate(`/fd/${fd.fdNumber}/renew`)}
+                >
                   Renew
                 </Button>
                 <Button variant="danger" onClick={() => navigate(`/fd/${fd.fdNumber}/close`)}>
@@ -78,11 +137,22 @@ export function FDDetailsPage() {
                 </Button>
               </>
             )}
+            {canReopen && (
+              <Button onClick={() => openReversal("reopen")}>Reopen FD</Button>
+            )}
+            {canReverse && (
+              <Button variant="primary" onClick={() => openReversal("reverse")}>
+                Reverse Renewal
+              </Button>
+            )}
           </>
         }
       />
 
       {created && <Alert tone="success" title="Fixed Deposit created">Saved as {fd.fdNumber}.</Alert>}
+      {edited && <Alert tone="success" title="Fixed Deposit updated">Your changes were saved.</Alert>}
+      {flash && <Alert tone="success" title="Reversal recorded">{flash}</Alert>}
+      {reversed && <Alert tone="success" title="Renewal reversed">The previous FD is active again.</Alert>}
 
       <div className="hs-kpi-row">
         <div className="hs-kpi hs-kpi--success">
@@ -181,6 +251,34 @@ export function FDDetailsPage() {
           />
         </CardBody>
       </Card>
+
+      <ConfirmDialog
+        open={reversal !== null}
+        danger
+        busy={reversing}
+        title={reversal === "reopen" ? "Reopen Fixed Deposit" : "Reverse renewal"}
+        confirmLabel={reversal === "reopen" ? "Confirm Reopen" : "Confirm Reversal"}
+        confirmDisabled={reason.trim() === ""}
+        message={
+          <>
+            <p>
+              {reversal === "reopen"
+                ? `${fd.fdNumber} will return to ACTIVE status. The original closure stays in the history along with your reason.`
+                : `The renewal will be withdrawn and ${(fd.renewedFrom ?? fd.fdNumber)} becomes active again. The withdrawn FD and its history are removed.`}
+            </p>
+            <FormField label="Reason" required htmlFor="reversal-reason">
+              <Textarea id="reversal-reason" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+            </FormField>
+            {reversalError && (
+              <Alert tone="danger" title="Could not complete the reversal">
+                {reversalError}
+              </Alert>
+            )}
+          </>
+        }
+        onConfirm={runReversal}
+        onCancel={closeReversal}
+      />
     </>
   );
 }

@@ -43,8 +43,8 @@ func (s *FDService) LoadSampleData() (int, error) {
 		{"Vikram Rao", "M-1006", 1000000, 640, 730},   // matures in 90 days
 		{"Sneha Kulkarni", "M-1007", 350000, 100, 1095},
 		{"Amit Sharma", "M-1008", 20000, 20, 180},
-		{"Pooja Mehta", "M-1009", 125000, 400, 730},
-		{"Rahul Verma", "M-1010", 60000, 500, 365},  // matured 135 days ago, still active
+		{"Pooja Mehta", "M-1009", 125000, 400, 365}, // matured 35 days ago, still active
+		{"Rahul Verma", "M-1010", 60000, 500, 365},  // matured 135 days ago; renewed below
 		{"Divya Nair", "M-1011", 85000, 300, 365},   // closed prematurely below
 		{"Karan Singh", "M-1012", 300000, 800, 730}, // closed at maturity below
 	}
@@ -82,11 +82,10 @@ func (s *FDService) LoadSampleData() (int, error) {
 		return s.countFDs(), err
 	}
 
-	// One renewal chain: principal + interest for another two years.
+	// One renewal chain on the long-matured deposit (principal + interest).
 	if _, err := s.Renew(api.RenewRequest{
-		FDNumber:   created["M-1009"].FDNumber,
+		FDNumber:   created["M-1010"].FDNumber,
 		Mode:       domain.RenewPrincipalPlusInterest,
-		StartDate:  todayISO,
 		TenureDays: 730,
 		Remark:     "Renewed for another two years",
 	}); err != nil {

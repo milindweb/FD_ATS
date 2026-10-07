@@ -133,6 +133,15 @@ func (a *App) CreateFD(req api.PreviewRequest) (api.FD, error) {
 	return a.service.Create(req)
 }
 
+// EditFD updates an active FD's details and recomputes derived amounts.
+// Closed FDs cannot be edited.
+func (a *App) EditFD(req api.EditFDRequest) (api.FD, error) {
+	if err := a.ready(); err != nil {
+		return api.FD{}, err
+	}
+	return a.service.EditFD(req)
+}
+
 // ListFDs returns one page of the dashboard FD list (SRS §9.2).
 func (a *App) ListFDs(req api.ListRequest) (api.ListResponse, error) {
 	if err := a.ready(); err != nil {
@@ -188,6 +197,22 @@ func (a *App) CloseFD(req api.CloseRequest) (api.FD, error) {
 		return api.FD{}, err
 	}
 	return a.service.Close(req)
+}
+
+// ReopenFD returns a closed FD to ACTIVE status with a recorded audit reason.
+func (a *App) ReopenFD(req api.ReopenRequest) (api.FD, error) {
+	if err := a.ready(); err != nil {
+		return api.FD{}, err
+	}
+	return a.service.Reopen(req)
+}
+
+// ReverseRenewal withdraws the renewed FD and reopens the previous one.
+func (a *App) ReverseRenewal(req api.ReverseRenewalRequest) (api.FD, error) {
+	if err := a.ready(); err != nil {
+		return api.FD{}, err
+	}
+	return a.service.ReverseRenewal(req)
 }
 
 // GetRateSlabs returns the interest rate configuration (SRS §13, §30).

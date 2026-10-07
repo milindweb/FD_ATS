@@ -39,6 +39,11 @@ export function RenewPage() {
 
   useEffect(() => {
     if (!fd) return;
+    setStartDate(fd.maturityDate > todayISO() ? fd.maturityDate : todayISO());
+  }, [fd]);
+
+  useEffect(() => {
+    if (!fd) return;
     let cancelled = false;
     const id = setTimeout(() => {
       PreviewFD({
@@ -84,7 +89,9 @@ export function RenewPage() {
   }
 
   const tenure = Number(tenureDays) || 0;
-  const valid = basePrincipal > 0 && startDate !== "" && tenure > 0;
+  const notMatured = todayISO() < fd.maturityDate;
+  const beforeMaturity = startDate !== "" && startDate < fd.maturityDate;
+  const valid = basePrincipal > 0 && startDate !== "" && tenure > 0 && !beforeMaturity && !notMatured;
 
   const submit = async () => {
     setError(null);
@@ -112,6 +119,12 @@ export function RenewPage() {
 
       {error && <Alert tone="danger" title="Could not renew the Fixed Deposit">{error}</Alert>}
 
+      {notMatured && (
+        <Alert tone="warning" title="Renewal not yet available">
+          This FD matures on {formatDate(fd.maturityDate)}. Renewal becomes available on or after that date.
+        </Alert>
+      )}
+
       <div className="hs-two-col">
         <Card>
           <CardHead title="Renewal Terms" />
@@ -133,8 +146,20 @@ export function RenewPage() {
                 </div>
               </FormField>
 
-              <FormField label="New Start Date" required htmlFor="renew-start">
-                <Input id="renew-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <FormField
+                label="New Start Date"
+                required
+                htmlFor="renew-start"
+                error={beforeMaturity ? "Renewal cannot start before the FD maturity date." : null}
+              >
+                <Input
+                  id="renew-start"
+                  type="date"
+                  value={startDate}
+                  min={fd.maturityDate}
+                  invalid={beforeMaturity}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
               </FormField>
 
               <FormField label="New Tenure (days)" required htmlFor="renew-tenure">
@@ -214,7 +239,7 @@ export function RenewPage() {
             )}
 
             <div className="u-mt-4">
-              <Button variant="primary" size="lg" block onClick={submit} loading={saving} disabled={!valid}>
+              <Button variant="primary" size="lg" block onClick={submit} loading={saving} disabled={!valid || previewError !== null}>
                 Confirm Renewal
               </Button>
             </div>

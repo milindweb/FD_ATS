@@ -54,15 +54,24 @@ Shows the complete deposit, status, closure information (when closed), links to 
 renewal FDs, and the **History** table (every open/renew/close event with amounts and
 remarks).
 
-Actions for active FDs: **Renew** and **Close FD**.
+Actions for active FDs: **Edit**, **Renew** and **Close FD**.
+
+Actions for closed FDs: **Reopen FD** (matured/premature closures) and
+**Reverse Renewal** (FDs closed by renewal, or the renewed FD itself while it
+is still active). Both require a reason that is recorded in the history.
 
 ## 5. Renewing an FD
 
-1. Open an active FD → **Renew**.
+1. Open an active FD → **Renew**. The Renew button only becomes available on
+   the FD's maturity date — before that it stays disabled with a note telling
+   you when renewal opens.
 2. Choose the mode:
    - **Principal Only** — only the deposit amount is renewed; interest is paid out.
    - **Principal + Interest** — earned interest is added to the new deposit.
-3. Set the **New Start Date** and **New Tenure**, optionally a remark.
+3. Set the **New Start Date** and **New Tenure**, optionally a remark. The start
+   date defaults to the FD's maturity date and cannot be set before it —
+   renewing early is blocked, but back-dated renewals on/after maturity are
+   allowed.
 4. Check the **Renewal Preview** (new rate, maturity date, new maturity amount).
 5. **Confirm Renewal**.
 
@@ -72,8 +81,9 @@ to each other. Nothing is deleted — history stays intact.
 ## 6. Closing an FD
 
 1. Open an active FD → **Close FD**.
-2. **Closure Date** (defaults to today; cannot be before the start date) and an optional
-   remark.
+2. **Closure Date** (defaults to today; cannot be before the start date) and a
+   remark — required for premature closures, optional when closing at/after
+   maturity.
 3. The **Payable Preview** shows days held, the rate applied (from the slab matching the
    actual days held), interest and the **Amount Payable**:
    - **Matured closure** (on/after maturity): payable equals the original maturity amount —
@@ -83,6 +93,22 @@ to each other. Nothing is deleted — history stays intact.
    the confirmation — it is exactly what the preview showed.
 
 Closed FDs remain searchable under the **Closed** filter and in reports.
+
+## 6a. Correcting a mistake
+
+- **Edit** (on an active FD): change the customer details, deposit amount,
+  start date or tenure. The rate, interest and maturity amount are recalculated
+  and an `EDIT` event is added to the history. FD numbers and closed FDs are
+  never editable.
+- **Reopen FD** (on a matured/premature closed FD): enter a reason; the FD
+  returns to ACTIVE and the closure stays visible in the history as part of
+  the audit trail, followed by a `REOPEN` event.
+- **Reverse Renewal** (on the old FD closed as RENEWED, or on the renewed FD
+  while it is still active): enter a reason; the renewed FD is withdrawn and
+  the previous FD becomes active again. Blocked once the renewed FD has been
+  closed or renewed itself.
+
+Nothing is silently overwritten — every reversal records its reason.
 
 ## 7. Reports
 
@@ -120,6 +146,8 @@ Changes apply to future calculations; existing FDs keep their recorded rates.
 | Closure date cannot be before the start date | Pick a valid closure date. |
 | FD number already exists | Retry — numbering is allocated automatically with retries. |
 | Only active FDs can be renewed/closed | The FD is already closed — open it to see details. |
+| This FD has not matured yet | Renewal opens on the maturity date — until then the Renew button is disabled. |
+| Closed FDs cannot be edited | Editing is only for active FDs — reopen it first if a correction is needed. |
 | Interest rate slabs overlap / are invalid | Fix slab day ranges in Settings. |
 | Could not open the local database | Close other programs using the file, then **Try Again**. |
 

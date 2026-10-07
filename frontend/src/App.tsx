@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { AboutPage } from "./pages/AboutPage";
 import { ClosePage } from "./pages/ClosePage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EditFDPage } from "./pages/EditFDPage";
 import { FDDetailsPage } from "./pages/FDDetailsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewFDPage } from "./pages/NewFDPage";
@@ -51,6 +52,7 @@ function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/new" element={<NewFDPage />} />
           <Route path="/fd/:fdNumber" element={<FDDetailsPage />} />
+          <Route path="/fd/:fdNumber/edit" element={<EditFDPage />} />
           <Route path="/fd/:fdNumber/renew" element={<RenewPage />} />
           <Route path="/fd/:fdNumber/close" element={<ClosePage />} />
           <Route path="/reports" element={<ReportsPage />} />

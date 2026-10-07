@@ -3,7 +3,7 @@
 
 export const brand = {
   product: "Fixed Deposit Management",
-  version: "1.0.0",
+  version: "1.1.0",
   developer: "Aarti Tech Services",
   services:
     "FULL STACK DEVELOPMENT, SEO DIGITAL MARKETING, ENGINEERING SOLUTIONS",

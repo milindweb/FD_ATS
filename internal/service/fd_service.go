@@ -117,6 +117,55 @@ func (s *FDService) Create(req api.PreviewRequest) (api.FD, error) {
 	return toFD(fd), nil
 }
 
+// EditFD updates the editable fields of an ACTIVE FD and recomputes the
+// derived rate/interest/maturity amounts. Closed FDs are locked (audit).
+func (s *FDService) EditFD(req api.EditFDRequest) (api.FD, error) {
+	fd, err := s.fds.Get(strings.TrimSpace(req.FDNumber))
+	if err != nil {
+		return api.FD{}, err
+	}
+	if fd.Status != domain.StatusActive {
+		return api.FD{}, domain.ErrEditClosed
+	}
+
+	res, err := s.computeFromRequest(api.PreviewRequest{
+		CustomerName:   req.CustomerName,
+		CustomerNumber: req.CustomerNumber,
+		Principal:      req.Principal,
+		StartDate:      req.StartDate,
+		TenureDays:     req.TenureDays,
+	})
+	if err != nil {
+		return api.FD{}, err
+	}
+
+	fd.CustomerName = strings.TrimSpace(req.CustomerName)
+	fd.CustomerNumber = strings.TrimSpace(req.CustomerNumber)
+	fd.Principal = res.Principal
+	fd.StartDate = domain.FormatDate(res.StartDate)
+	fd.TenureDays = res.TenureDays
+	fd.InterestRate = res.RatePercent
+	fd.MaturityDate = domain.FormatDate(res.MaturityDate)
+	fd.InterestAmount = res.Interest
+	fd.MaturityAmount = res.MaturityAmount
+	fd.UpdatedAt = formatTimestamp(s.nowUTC())
+
+	if err := s.fds.Update(fd); err != nil {
+		return api.FD{}, err
+	}
+	if err := s.history.Append(domain.HistoryEntry{
+		FDNumber:  fd.FDNumber,
+		EventDate: domain.FormatDate(s.nowUTC()),
+		EventType: domain.EventEdit,
+		Amount:    fd.Principal,
+		Remarks:   "FD details edited",
+		CreatedAt: fd.UpdatedAt,
+	}); err != nil {
+		return api.FD{}, fmt.Errorf("record history: %w", err)
+	}
+	return toFD(fd), nil
+}
+
 func (s *FDService) computeFromRequest(req api.PreviewRequest) (calc.Result, error) {
 	if err := validateCreate(req); err != nil {
 		return calc.Result{}, err
@@ -344,6 +393,11 @@ func (s *FDService) Renew(req api.RenewRequest) (api.RenewResult, error) {
 	if req.TenureDays <= 0 {
 		return api.RenewResult{}, domain.ErrInvalidTenure
 	}
+	// Renewal itself is only possible once the maturity date has been
+	// reached; until then the deposit is still invested.
+	if domain.FormatDate(s.nowUTC()) < fd.MaturityDate {
+		return api.RenewResult{}, domain.ErrRenewNotMatured
+	}
 
 	startISO := strings.TrimSpace(req.StartDate)
 	if startISO == "" {
@@ -356,6 +410,10 @@ func (s *FDService) Renew(req api.RenewRequest) (api.RenewResult, error) {
 	if domain.DaysBetween(mustParse(fd.StartDate), start) < 0 {
 		return api.RenewResult{}, domain.ErrClosureBeforeStart
 	}
+	oldMaturity, _ := domain.ParseDate(fd.MaturityDate)
+	if domain.DaysBetween(oldMaturity, start) < 0 {
+		return api.RenewResult{}, domain.ErrRenewBeforeMaturity
+	}
 
 	slabs, err := s.slabs.List()
 	if err != nil {
@@ -367,7 +425,6 @@ func (s *FDService) Renew(req api.RenewRequest) (api.RenewResult, error) {
 	}
 
 	// Earned interest on the old FD as of the renewal date (SRS §21).
-	oldMaturity, _ := domain.ParseDate(fd.MaturityDate)
 	earned, err := calc.ComputeClosure(
 		fd.Principal, fd.InterestRate,
 		mustParse(fd.StartDate), oldMaturity,
@@ -493,6 +550,9 @@ func (s *FDService) Close(req api.CloseRequest) (api.FD, error) {
 	if err != nil {
 		return api.FD{}, err
 	}
+	if res.Type == domain.ClosurePremature && strings.TrimSpace(req.Remark) == "" {
+		return api.FD{}, domain.ErrClosureRemarkRequired
+	}
 
 	now := s.nowUTC()
 	closureType := res.Type
@@ -545,9 +605,6 @@ func (s *FDService) prepareClosure(req api.CloseRequest) (domain.FixedDeposit, c
 	if err != nil {
 		return domain.FixedDeposit{}, calc.ClosureResult{}, domain.ErrInvalidDate
 	}
-	if strings.TrimSpace(req.Remark) == "" {
-		return domain.FixedDeposit{}, calc.ClosureResult{}, domain.ErrClosureRemarkRequired
-	}
 
 	slabs, err := s.slabs.List()
 	if err != nil {
@@ -564,6 +621,107 @@ func (s *FDService) prepareClosure(req api.CloseRequest) (domain.FixedDeposit, c
 		return domain.FixedDeposit{}, calc.ClosureResult{}, err
 	}
 	return fd, res, nil
+}
+
+// ---------------------------------------------------------------------------
+// Reversals
+// ---------------------------------------------------------------------------
+
+// Reopen returns a closed FD to ACTIVE status. The remark is the mandatory
+// audit reason; renewals must be undone with ReverseRenewal instead.
+func (s *FDService) Reopen(req api.ReopenRequest) (api.FD, error) {
+	fd, err := s.fds.Get(strings.TrimSpace(req.FDNumber))
+	if err != nil {
+		return api.FD{}, err
+	}
+	if fd.Status != domain.StatusClosed {
+		return api.FD{}, domain.ErrNotClosed
+	}
+	if fd.ClosureType != nil && *fd.ClosureType == domain.ClosureRenewed {
+		return api.FD{}, domain.ErrRenewedCannotReopen
+	}
+	remark := strings.TrimSpace(req.Remark)
+	if remark == "" {
+		return api.FD{}, domain.ErrReversalReasonRequired
+	}
+
+	now := s.nowUTC()
+	fd.Status = domain.StatusActive
+	fd.ClosureDate = nil
+	fd.ClosureType = nil
+	fd.ClosureRemark = ""
+	fd.ClosureRate = nil
+	fd.ClosureDays = nil
+	fd.ClosureInterest = nil
+	fd.ClosurePayable = nil
+	fd.UpdatedAt = formatTimestamp(now)
+
+	if err := s.fds.Update(fd); err != nil {
+		return api.FD{}, err
+	}
+	if err := s.history.Append(domain.HistoryEntry{
+		FDNumber:  fd.FDNumber,
+		EventDate: domain.FormatDate(now),
+		EventType: domain.EventReopen,
+		Remarks:   remark,
+		CreatedAt: formatTimestamp(now),
+	}); err != nil {
+		return api.FD{}, err
+	}
+	return toFD(fd), nil
+}
+
+// ReverseRenewal withdraws the renewed FD and reopens the previous one in a
+// single transaction. It only works while the renewed FD is still untouched.
+func (s *FDService) ReverseRenewal(req api.ReverseRenewalRequest) (api.FD, error) {
+	fd, err := s.fds.Get(strings.TrimSpace(req.FDNumber))
+	if err != nil {
+		return api.FD{}, err
+	}
+	if fd.Status != domain.StatusClosed || fd.ClosureType == nil || *fd.ClosureType != domain.ClosureRenewed {
+		return api.FD{}, domain.ErrNotRenewed
+	}
+	if fd.RenewedTo == nil || *fd.RenewedTo == "" {
+		return api.FD{}, domain.ErrNotRenewed
+	}
+
+	withdrawn, err := s.fds.Get(*fd.RenewedTo)
+	if err != nil {
+		return api.FD{}, err
+	}
+	if withdrawn.Status != domain.StatusActive {
+		return api.FD{}, domain.ErrRenewalAlreadyUsed
+	}
+
+	remark := strings.TrimSpace(req.Remark)
+	if remark == "" {
+		return api.FD{}, domain.ErrReversalReasonRequired
+	}
+
+	now := s.nowUTC()
+	fd.Status = domain.StatusActive
+	fd.ClosureDate = nil
+	fd.ClosureType = nil
+	fd.ClosureRemark = ""
+	fd.ClosureRate = nil
+	fd.ClosureDays = nil
+	fd.ClosureInterest = nil
+	fd.ClosurePayable = nil
+	fd.RenewedTo = nil
+	fd.UpdatedAt = formatTimestamp(now)
+
+	entry := domain.HistoryEntry{
+		FDNumber:    fd.FDNumber,
+		EventDate:   domain.FormatDate(now),
+		EventType:   domain.EventReverse,
+		ReferenceFD: withdrawn.FDNumber,
+		Remarks:     remark,
+		CreatedAt:   formatTimestamp(now),
+	}
+	if err := s.fds.ReverseRenewal(fd, withdrawn.FDNumber, entry); err != nil {
+		return api.FD{}, err
+	}
+	return toFD(fd), nil
 }
 
 // ---------------------------------------------------------------------------
