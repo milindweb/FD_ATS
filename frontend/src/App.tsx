@@ -6,7 +6,11 @@ import { ClosePage } from "./pages/ClosePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditFDPage } from "./pages/EditFDPage";
 import { FDDetailsPage } from "./pages/FDDetailsPage";
+import { FDMasterPage } from "./pages/FDMasterPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MemberFormPage } from "./pages/MemberFormPage";
+import { MemberListPage } from "./pages/MemberListPage";
+import { MemberProfilePage } from "./pages/MemberProfilePage";
 import { NewFDPage } from "./pages/NewFDPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { RenewPage } from "./pages/RenewPage";
@@ -50,6 +54,11 @@ function App() {
       <AppShell onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/fds" element={<FDMasterPage />} />
+          <Route path="/member" element={<MemberListPage />} />
+          <Route path="/member/new" element={<MemberFormPage mode="create" />} />
+          <Route path="/member/:memberId/edit" element={<MemberFormPage mode="edit" />} />
+          <Route path="/member/:memberId" element={<MemberProfilePage />} />
           <Route path="/new" element={<NewFDPage />} />
           <Route path="/fd/:fdNumber" element={<FDDetailsPage />} />
           <Route path="/fd/:fdNumber/edit" element={<EditFDPage />} />

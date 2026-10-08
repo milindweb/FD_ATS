@@ -51,12 +51,15 @@ func (s *FDService) LoadSampleData() (int, error) {
 
 	created := make(map[string]api.FD, len(specs))
 	for _, sp := range specs {
+		memberID, err := s.sampleMember(sp.number, sp.name)
+		if err != nil {
+			return s.countFDs(), err
+		}
 		fd, err := s.Create(api.PreviewRequest{
-			CustomerName:   sp.name,
-			CustomerNumber: sp.number,
-			Principal:      sp.principal,
-			StartDate:      domain.FormatDate(domain.AddDays(today, -sp.startDaysAgo)),
-			TenureDays:     sp.tenureDays,
+			MemberID:   memberID,
+			Principal:  sp.principal,
+			StartDate:  domain.FormatDate(domain.AddDays(today, -sp.startDaysAgo)),
+			TenureDays: sp.tenureDays,
 		})
 		if err != nil {
 			return s.countFDs(), err
@@ -93,6 +96,26 @@ func (s *FDService) LoadSampleData() (int, error) {
 	}
 
 	return s.countFDs(), nil
+}
+
+// sampleMember returns the ID of the demo member for a GEN No., creating it
+// on first use so every sample FD is linked to a member (SRS §53). An
+// existing member with the same GEN is reused instead of duplicated.
+func (s *FDService) sampleMember(gen, name string) (int64, error) {
+	if m, err := s.members.members.GetByGEN(gen); err == nil {
+		return m.ID, nil
+	}
+	ts := formatTimestamp(s.nowUTC())
+	id, err := s.members.members.Insert(domain.Member{
+		GENNo:     gen,
+		Name:      name,
+		CreatedAt: ts,
+		UpdatedAt: ts,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 // countFDs returns the total number of FD rows currently stored.

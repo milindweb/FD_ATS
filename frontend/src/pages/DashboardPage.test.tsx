@@ -3,6 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const navigate = vi.fn();
+
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return { ...actual, useNavigate: () => navigate };
+});
+
 vi.mock("../../wailsjs/go/main/App", () => ({
   SystemStatus: vi.fn().mockResolvedValue({ ready: true, error: "", authed: true }),
   DashboardStats: vi.fn().mockResolvedValue({
@@ -17,31 +24,9 @@ vi.mock("../../wailsjs/go/main/App", () => ({
     maturing30: 2,
     maturing90: 3,
   }),
-  ListFDs: vi.fn().mockResolvedValue({
-    items: [
-      {
-        fdNumber: "FD-26-001",
-        customerName: "Asha",
-        customerNumber: "M-1",
-        principal: 50000,
-        startDate: "2026-01-01",
-        tenureDays: 365,
-        interestRate: 4,
-        maturityDate: "2027-01-01",
-        interestAmount: 2000,
-        maturityAmount: 52000,
-        status: "ACTIVE",
-        createdAt: "",
-        updatedAt: "",
-      },
-    ],
-    total: 1,
-    page: 1,
-    pageSize: 25,
-  }),
   UpcomingMaturities: vi.fn().mockResolvedValue([
     {
-      fdNumber: "FD-26-009",
+      fdNumber: "FD-9",
       customerName: "Asha",
       principal: 50000,
       maturityDate: "2027-01-01",
@@ -59,43 +44,10 @@ vi.mock("../../wailsjs/go/main/App", () => ({
       amount: 0,
     })),
   ]),
-  GetFD: vi.fn().mockResolvedValue({
-    fd: {
-      fdNumber: "FD-26-001",
-      customerName: "Asha",
-      customerNumber: "M-1",
-      principal: 50000,
-      startDate: "2026-01-01",
-      tenureDays: 365,
-      interestRate: 4,
-      maturityDate: "2027-01-01",
-      interestAmount: 2000,
-      maturityAmount: 52000,
-      status: "ACTIVE",
-      createdAt: "",
-      updatedAt: "",
-    },
-    history: [],
-  }),
 }));
 
-vi.mock("./LoginPage", async () => {
-  const { useEffect } = await import("react");
-  return {
-    // Auto-sign-in so route-level tests can exercise the gated app.
-    LoginPage: ({ onSuccess }: { onSuccess: () => void }) => {
-      useEffect(() => {
-        onSuccess();
-      }, []);
-      return null;
-    },
-  };
-});
-
-import { GetFD, ListFDs } from "../../wailsjs/go/main/App";
 import { AppShell } from "../components/layout/AppShell";
 import { DashboardPage } from "./DashboardPage";
-import App from "../App";
 
 function renderDashboard() {
   return render(
@@ -110,7 +62,7 @@ describe("DashboardPage", () => {
     vi.clearAllMocks();
   });
 
-  it("shows KPIs and the FD list", async () => {
+  it("shows the KPI row, upcoming maturities and the chart (SRS §9.1)", async () => {
     renderDashboard();
 
     expect(await screen.findByText("Active FDs")).toBeInTheDocument();
@@ -119,30 +71,37 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("₹1,00,000")).toBeInTheDocument(); // FY deposits (big value)
     expect(await screen.findByText(/FY 2026-27/)).toBeInTheDocument(); // FY label (meta)
     expect(await screen.findByText("₹1,75,000")).toBeInTheDocument(); // total deposit
-    expect(await screen.findByText("FD-26-001")).toBeInTheDocument();
     expect(await screen.findByText("Upcoming Maturities")).toBeInTheDocument();
     expect(await screen.findByText("Maturities by Month")).toBeInTheDocument();
-    expect(screen.queryByText("Maturing Soon")).not.toBeInTheDocument();
-    expect(ListFDs).toHaveBeenCalledWith({ search: "", filter: "ALL", page: 1, pageSize: 25 });
+    // The upcoming table uses the SRS member wording.
+    expect(await screen.findByText("Member Name")).toBeInTheDocument();
   });
 
-  it("passes the search term to the backend", async () => {
+  it("offers the quick actions under the quick search (SRS §9.1)", async () => {
     renderDashboard();
-    const search = await screen.findByLabelText("Search FDs");
-    await userEvent.type(search, "asha");
 
-    await vi.waitFor(() => {
-      expect(ListFDs).toHaveBeenCalledWith({ search: "asha", filter: "ALL", page: 1, pageSize: 25 });
-    });
+    expect(await screen.findByText("New Member")).toBeInTheDocument();
+    expect(screen.getByText("Create New FD")).toBeInTheDocument();
+    expect(screen.getByText("View full FD list")).toBeInTheDocument();
+    expect(screen.getByLabelText("Quick search")).toBeInTheDocument();
   });
 
-  it("navigates to the FD details screen when a row is clicked", async () => {
-    render(<App />);
+  it("hands the quick-search query to the FD Master page on Enter", async () => {
+    renderDashboard();
 
-    await userEvent.click(await screen.findByText("FD-26-001"));
+    const search = await screen.findByLabelText("Quick search");
+    await userEvent.type(search, "asha{Enter}");
 
-    expect(await screen.findByText("Deposit Details")).toBeInTheDocument();
-    expect(GetFD).toHaveBeenCalledWith("FD-26-001");
+    expect(navigate).toHaveBeenCalledWith("/fds?q=asha");
+  });
+
+  it("opens the FD Master list when Enter is pressed with an empty query", async () => {
+    renderDashboard();
+
+    const search = await screen.findByLabelText("Quick search");
+    await userEvent.type(search, "{Enter}");
+
+    expect(navigate).toHaveBeenCalledWith("/fds");
   });
 });
 

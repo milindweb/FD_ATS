@@ -10,7 +10,13 @@ export function BackupDatabase(arg1:string):Promise<string>;
 
 export function ChangeCredentials(arg1:api.ChangeCredentialsRequest):Promise<api.AuthInfo>;
 
+export function ChangePassword(arg1:api.ChangePasswordRequest):Promise<api.AuthInfo>;
+
+export function ChangeUsername(arg1:api.ChangeUsernameRequest):Promise<api.AuthInfo>;
+
 export function CloseFD(arg1:api.CloseRequest):Promise<api.FD>;
+
+export function CommitMemberImport(arg1:string):Promise<api.MemberImportResult>;
 
 export function CreateFD(arg1:api.PreviewRequest):Promise<api.FD>;
 
@@ -24,9 +30,13 @@ export function GetAuthInfo():Promise<api.AuthInfo>;
 
 export function GetFD(arg1:string):Promise<api.FDDetail>;
 
+export function GetMemberProfile(arg1:number):Promise<api.MemberProfile>;
+
 export function GetRateSlabs():Promise<Array<domain.RateSlab>>;
 
 export function ListFDs(arg1:api.ListRequest):Promise<api.ListResponse>;
+
+export function ListMembers(arg1:api.MemberListRequest):Promise<api.MemberListResponse>;
 
 export function LoadSampleData():Promise<number>;
 
@@ -38,6 +48,8 @@ export function MaturityChart():Promise<Array<api.MaturityBucket>>;
 
 export function PickBackupPath():Promise<string>;
 
+export function PickMemberImportPath():Promise<string>;
+
 export function PickReportPath(arg1:string):Promise<string>;
 
 export function PickRestorePath():Promise<string>;
@@ -45,6 +57,8 @@ export function PickRestorePath():Promise<string>;
 export function PreviewClosure(arg1:api.CloseRequest):Promise<api.ClosurePreview>;
 
 export function PreviewFD(arg1:api.PreviewRequest):Promise<api.Calculation>;
+
+export function PreviewMemberImport(arg1:string):Promise<api.MemberImportPreview>;
 
 export function PreviewReport(arg1:api.ReportRequest):Promise<api.ReportPreview>;
 
@@ -57,6 +71,8 @@ export function ResetCredentials(arg1:api.ResetCredentialsRequest):Promise<api.A
 export function RestoreDatabase(arg1:string):Promise<void>;
 
 export function ReverseRenewal(arg1:api.ReverseRenewalRequest):Promise<api.FD>;
+
+export function SaveMember(arg1:api.SaveMemberRequest):Promise<api.Member>;
 
 export function SaveRateSlabs(arg1:api.SaveSlabsRequest):Promise<void>;
 

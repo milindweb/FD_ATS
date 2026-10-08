@@ -22,7 +22,8 @@ export type IconName =
   | "refresh"
   | "logout"
   | "banknote"
-  | "percent";
+  | "percent"
+  | "users";
 
 const paths: Record<IconName, string> = {
   grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
@@ -47,6 +48,8 @@ const paths: Record<IconName, string> = {
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
   banknote: "M2 6h20v12H2zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M5 9h.01M19 15h.01",
   percent: "M19 5 5 19M7.25 7.25a1.75 1.75 0 1 1-3.5 0 1.75 1.75 0 0 1 3.5 0M20.25 16.75a1.75 1.75 0 1 1-3.5 0 1.75 1.75 0 0 1 3.5 0",
+  users:
+    "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
 };
 
 export interface IconProps {

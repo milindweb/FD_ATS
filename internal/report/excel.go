@@ -16,8 +16,14 @@ type Options struct {
 	Kind        string
 	Title       string
 	FDs         []domain.FixedDeposit
+	Members     []domain.MemberWithStats // member-wise summary (SRS §29.6)
 	GeneratedAt time.Time
 	Path        string
+
+	// UnassignedActiveFDCount/UnassignedActiveAmount aggregate active FDs
+	// with no member link, reported as the "Unassigned" row (SRS §53).
+	UnassignedActiveFDCount int64
+	UnassignedActiveAmount  int64
 }
 
 const sheetName = "Report"
@@ -206,7 +212,7 @@ var styleRate = excelize.Style{
 
 func isMoneyColumn(header string) bool {
 	switch header {
-	case "Days Remaining", "Tenure (Days)", "Status":
+	case "Days Remaining", "Tenure", "Status", "Active FD Count":
 		return false
 	}
 	return true
@@ -216,15 +222,21 @@ func columnWidth(header string) float64 {
 	switch header {
 	case "FD Number":
 		return 14
-	case "Customer/Member", "Remark", "Closure Type":
+	case "Member Name", "Remark", "Closure Type":
 		return 24
-	case "Customer/Member Number":
+	case "GEN No.":
+		return 16
+	case "Designation":
+		return 18
+	case "Active FD Count":
+		return 16
+	case "Total Active FD Amount":
 		return 22
 	case "Status":
 		return 12
 	case "Start Date", "Maturity Date", "Closure Date":
 		return 14
-	case "Tenure (Days)", "Days Remaining":
+	case "Tenure", "Days Remaining":
 		return 15
 	}
 	return 18

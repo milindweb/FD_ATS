@@ -13,13 +13,15 @@ and `docs/design.md`.
 
 | Area | What it does |
 | --- | --- |
-| Dashboard | KPIs (active FDs, total deposit, maturing today/soon), searchable & filterable FD list, pagination, upcoming maturities (next 90 days) |
-| New FD | Live calculation preview while typing (SRS §10), client-side validation, tenure presets |
-| FD Details | Full deposit info, status, closure details, linked renewal FDs, chronological history |
+| Dashboard | KPIs (active FDs, total deposit, interest, financial-year deposits), maturity chart, quick search (opens FD Master), quick actions, upcoming maturities (next 90 days) |
+| FD Master | Full searchable & filterable FD list with pagination (FD Number, FD Form No., Member Name or GEN No.) |
+| Members | Add/edit/search members, member profile with linked FDs, bulk Excel import with preview, member-wise FD aggregates (SRS §50–§52) |
+| New FD | Mandatory member selection + optional FD Form No., live calculation preview while typing (SRS §10), client-side validation, tenure presets |
+| FD Details | Member Name, GEN No. and FD Form No., status, closure details, linked renewal FDs, chronological history |
 | Renew | Principal-only or principal + interest; old FD closed as `RENEWED`, new FD number issued (SRS §21–§22) |
 | Close | Payable preview before confirmation, premature (actual days) or matured closure (SRS §23–§26) |
-| Reports | FD Register, Maturity, Active and Closed reports as `.xlsx` with autofilters (SRS §29) |
-| Settings | Editable interest rate slabs (SRS §13, §30) |
+| Reports | FD Register, Maturity, Active, Closed and Member-wise FD Summary as `.xlsx` with autofilters (SRS §29) |
+| Settings | Three tabs: editable interest rate slabs, login credentials (change username/password with rotating recovery code), backup/restore + sample data (SRS §13, §30) |
 | About / Privacy | Branding (SRS §31, §49) and privacy policy (SRS §33) |
 
 ### Business rules (SRS §47)
@@ -31,14 +33,15 @@ Rate slabs        1–364 → 4.00% · 365–729 → 8.00% · 730–1094 → 8.5
 Premature closure rate is picked from the ACTUAL days held
 Matured closure   payable ≤ original maturity amount (no extra interest)
 Renewal           creates a NEW FD number (principal only, or principal + interest)
-FD numbers        FD-YY-NNN where YY comes from the start date
+FD numbers        FD-1, FD-2, … one global sequence; legacy FD-YY-NNN numbers
+                  are renumbered automatically on first start after upgrade
 ```
 
 ---
 
 ## Quick start (development)
 
-Prerequisites: Go 1.24+, Node.js 18+, [Wails CLI v2](https://wails.io) (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`).
+Prerequisites: Go 1.26+, Node.js 18+, [Wails CLI v2](https://wails.io) (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`).
 
 ```powershell
 # Backend tests
@@ -86,7 +89,7 @@ main.go / app.go            Wails binding surface (thin: validates readiness, de
 internal/domain             Entities, date helpers, centralized error messages
 internal/calc               Interest/maturity/closure engine (pure functions, fully tested)
 internal/repo               SQLite persistence (modernc.org/sqlite — no CGO)
-internal/service            Business flows: create, list, renew, close, dashboard, reports
+internal/service            Business flows: members, create, list, renew, close, dashboard, reports
 internal/report             Excel (.xlsx) export via excelize
 internal/api                DTOs shared by service and bindings (JSON = camelCase)
 frontend/src/lib            api.ts (single backend import surface), formatting, icons, theme
@@ -102,7 +105,7 @@ override with the `FD_ATS_DATA_DIR` environment variable.
 
 ```powershell
 go test ./...                          # domain, calculation, service flows, Excel export
-cd frontend; npm run test              # 28 vitest tests: format, tones, components, pages
+cd frontend; npm run test              # 62 vitest tests: format, tones, components, pages
 ```
 
 `internal/service` includes `TestRecommendedUserFlow`, which walks the complete

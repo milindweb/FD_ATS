@@ -45,8 +45,12 @@ const (
 
 // FixedDeposit is the FD master record (SRS §12).
 // Monetary values are whole rupees; dates are ISO YYYY-MM-DD strings.
+// MemberID links the FD to its member (nil = legacy/unassigned, SRS §53);
+// FDFormNo is the optional manual paper-form reference (SRS §10).
 type FixedDeposit struct {
 	FDNumber        string
+	MemberID        *int64
+	FDFormNo        string
 	CustomerName    string
 	CustomerNumber  string
 	Principal       int64
@@ -68,6 +72,41 @@ type FixedDeposit struct {
 	RenewedTo       *string
 	CreatedAt       string
 	UpdatedAt       string
+}
+
+// Member is the member master record (SRS §50). GEN No. is the unique
+// primary identifier; dates are ISO YYYY-MM-DD strings.
+type Member struct {
+	ID                  int64
+	GENNo               string
+	Name                string
+	DOB                 string
+	Mobile              string
+	Email               string
+	PresentAddress      string
+	PermanentAddress    string
+	EmployerName        string
+	Department          string
+	Designation         string
+	TokenNo             string
+	NomineeName         string
+	NomineeRelationship string
+	Aadhaar             string
+	PAN                 string
+	BankName            string
+	AccountNo           string
+	IFSC                string
+	ProfileRemarks      string
+	CreatedAt           string
+	UpdatedAt           string
+}
+
+// MemberWithStats is a member row carrying FD aggregates for lists
+// (SRS §51.2: Active FDs, Total Active FD Amount).
+type MemberWithStats struct {
+	Member
+	ActiveFDCount int
+	ActiveFDAmount int64
 }
 
 // HistoryEntry is one chronological event recorded for an FD (SRS §20).

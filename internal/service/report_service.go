@@ -17,6 +17,7 @@ var reportTitles = map[string]string{
 	api.ReportMaturity: "Maturity Report",
 	api.ReportActive:   "Active FD Report",
 	api.ReportClosed:   "Closed FD Report",
+	api.ReportMembers:  "Member-wise FD Summary",
 }
 
 // ExportReport gathers the requested dataset and writes it to an .xlsx file
@@ -36,22 +37,17 @@ func (s *FDService) ExportReport(req api.ReportRequest) (api.ReportResult, error
 
 	generatedAt := s.nowUTC().In(time.Local)
 
-	fds, err := s.reportData(req, generatedAt)
+	opts, err := s.reportOptions(req, title, generatedAt)
 	if err != nil {
 		return api.ReportResult{}, err
 	}
+	opts.Path = path
 
-	if err := report.Export(report.Options{
-		Kind:        req.Kind,
-		Title:       title,
-		FDs:         fds,
-		GeneratedAt: generatedAt,
-		Path:        path,
-	}); err != nil {
+	if err := report.Export(opts); err != nil {
 		return api.ReportResult{}, err
 	}
 
-	return api.ReportResult{Path: path, RowCount: len(fds)}, nil
+	return api.ReportResult{Path: path, RowCount: reportRowCount(opts)}, nil
 }
 
 // previewRowLimit bounds the rows returned for the on-screen preview; the
@@ -67,17 +63,12 @@ func (s *FDService) PreviewReport(req api.ReportRequest) (api.ReportPreview, err
 	}
 
 	generatedAt := s.nowUTC().In(time.Local)
-	fds, err := s.reportData(req, generatedAt)
+	opts, err := s.reportOptions(req, title, generatedAt)
 	if err != nil {
 		return api.ReportPreview{}, err
 	}
 
-	headers, rows := report.Sheet(report.Options{
-		Kind:        req.Kind,
-		Title:       title,
-		FDs:         fds,
-		GeneratedAt: generatedAt,
-	})
+	headers, rows := report.Sheet(opts)
 
 	preview := make([][]string, 0, min(len(rows), previewRowLimit))
 	for i, row := range rows {
@@ -97,6 +88,48 @@ func (s *FDService) PreviewReport(req api.ReportRequest) (api.ReportPreview, err
 		Rows:    preview,
 		Total:   len(rows),
 	}, nil
+}
+
+// reportOptions loads the dataset for a report kind into export options
+// (SRS §29). The member-wise summary reads members instead of FD rows.
+func (s *FDService) reportOptions(req api.ReportRequest, title string, generatedAt time.Time) (report.Options, error) {
+	opts := report.Options{
+		Kind:        req.Kind,
+		Title:       title,
+		GeneratedAt: generatedAt,
+	}
+	if req.Kind == api.ReportMembers {
+		members, err := s.members.AllWithStats()
+		if err != nil {
+			return opts, err
+		}
+		count, amount, err := s.fds.UnassignedActiveSummary()
+		if err != nil {
+			return opts, err
+		}
+		opts.Members = members
+		opts.UnassignedActiveFDCount = count
+		opts.UnassignedActiveAmount = amount
+		return opts, nil
+	}
+	fds, err := s.reportData(req, generatedAt)
+	if err != nil {
+		return opts, err
+	}
+	opts.FDs = fds
+	return opts, nil
+}
+
+// reportRowCount is the number of data rows a report will contain.
+func reportRowCount(opts report.Options) int {
+	if opts.Kind == api.ReportMembers {
+		n := len(opts.Members)
+		if opts.UnassignedActiveFDCount > 0 {
+			n++
+		}
+		return n
+	}
+	return len(opts.FDs)
 }
 
 // reportData loads the FD dataset for a report kind (SRS §29).

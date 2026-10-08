@@ -8,11 +8,26 @@ vi.mock("../../wailsjs/go/main/App", () => ({
   EditFD: vi.fn(),
 }));
 
+vi.mock("../components/member/MemberPicker", () => ({
+  MemberPicker: (p: any) => (
+    <div data-testid="member-picker">
+      <button type="button" data-testid="member-pick" onClick={() => p.onSelect({ id: 1, genNo: "GEN-1", name: "Test Member" })}>
+        Pick member
+      </button>
+      <button type="button" data-testid="member-clear" onClick={() => p.onSelect({ id: 0, genNo: "", name: "" })}>
+        Clear member
+      </button>
+    </div>
+  ),
+}));
+
 import { EditFD, GetFD, PreviewFD } from "../../wailsjs/go/main/App";
 import { EditFDPage } from "./EditFDPage";
 
 const activeFd = {
   fdNumber: "FD-26-001",
+  memberId: 1,
+  fdFormNo: "FORM-1042",
   customerName: "Asha",
   customerNumber: "M-1",
   principal: 50000,
@@ -58,8 +73,8 @@ describe("EditFDPage", () => {
   it("preloads current values, previews and saves the edit", async () => {
     renderEdit();
 
-    const name = await screen.findByLabelText(/Customer \/ Member Name/);
-    expect(name).toHaveValue("Asha");
+    expect(await screen.findByTestId("member-picker")).toBeInTheDocument();
+    expect(screen.getByLabelText(/FD Form No/)).toHaveValue("FORM-1042");
     expect(screen.getByLabelText(/Deposit Amount/)).toHaveValue(50000);
     expect(screen.getByLabelText(/^Tenure \(days\)/)).toHaveValue(365);
 
@@ -70,13 +85,19 @@ describe("EditFDPage", () => {
       expect(save).toBeEnabled();
     });
 
+    await vi.waitFor(() => {
+      expect(PreviewFD).toHaveBeenCalledWith(
+        expect.objectContaining({ memberId: 1, fdFormNo: "FORM-1042" }),
+      );
+    });
+
     fireEvent.click(save);
 
     await vi.waitFor(() => {
       expect(EditFD).toHaveBeenCalledWith({
         fdNumber: "FD-26-001",
-        customerName: "Asha",
-        customerNumber: "M-1",
+        memberId: 1,
+        fdFormNo: "FORM-1042",
         principal: 75000,
         startDate: "2026-01-01",
         tenureDays: 365,
@@ -92,8 +113,27 @@ describe("EditFDPage", () => {
       expect(save).toBeEnabled();
     });
 
-    fireEvent.change(screen.getByLabelText(/Customer \/ Member Name/), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("member-clear"));
     expect(save).toBeDisabled();
+    expect(screen.getByText("Select a linked member before saving.")).toBeInTheDocument();
+  });
+
+  it("requires a member before saving an FD with no linked member", async () => {
+    vi.mocked(GetFD).mockResolvedValue({ fd: { ...activeFd, memberId: undefined }, history: [] } as never);
+
+    renderEdit();
+
+    const save = await screen.findByRole("button", { name: "Save Changes" });
+    expect(save).toBeDisabled();
+    expect(screen.getByText("This FD is not linked to a member yet — select one to continue.")).toBeInTheDocument();
+    expect(screen.getByText("Select a linked member before saving.")).toBeInTheDocument();
+    expect(PreviewFD).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("member-pick"));
+
+    await vi.waitFor(() => {
+      expect(save).toBeEnabled();
+    });
   });
 
   it("refuses to edit a closed FD", async () => {

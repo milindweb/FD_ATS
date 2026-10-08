@@ -449,6 +449,34 @@ func (a *App) ChangeCredentials(req api.ChangeCredentialsRequest) (api.AuthInfo,
 	return api.AuthInfo{Username: username, RecoveryCode: code}, nil
 }
 
+// ChangeUsername replaces the username from its own Settings card and
+// refreshes the recovery file (SRS §30.2).
+func (a *App) ChangeUsername(req api.ChangeUsernameRequest) (api.AuthInfo, error) {
+	if err := a.ready(); err != nil {
+		return api.AuthInfo{}, err
+	}
+	username, code, err := a.service.ChangeUsername(req.CurrentPassword, req.NewUsername)
+	if err != nil {
+		return api.AuthInfo{}, err
+	}
+	writeRecoveryFile(dataDir(), username, code)
+	return api.AuthInfo{Username: username, RecoveryCode: code}, nil
+}
+
+// ChangePassword replaces the password from its own Settings card and
+// refreshes the recovery file (SRS §30.2).
+func (a *App) ChangePassword(req api.ChangePasswordRequest) (api.AuthInfo, error) {
+	if err := a.ready(); err != nil {
+		return api.AuthInfo{}, err
+	}
+	username, code, err := a.service.ChangePassword(req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		return api.AuthInfo{}, err
+	}
+	writeRecoveryFile(dataDir(), username, code)
+	return api.AuthInfo{Username: username, RecoveryCode: code}, nil
+}
+
 // ResetCredentials recovers a forgotten login using the recovery code and
 // refreshes the recovery file. Available before signing in.
 func (a *App) ResetCredentials(req api.ResetCredentialsRequest) (api.AuthInfo, error) {
@@ -461,4 +489,66 @@ func (a *App) ResetCredentials(req api.ResetCredentialsRequest) (api.AuthInfo, e
 	}
 	writeRecoveryFile(dataDir(), username, code)
 	return api.AuthInfo{Username: username, RecoveryCode: code}, nil
+}
+
+// ListMembers returns one page of the member list with FD aggregates
+// (SRS §51.1, §51.2).
+func (a *App) ListMembers(req api.MemberListRequest) (api.MemberListResponse, error) {
+	if err := a.ready(); err != nil {
+		return api.MemberListResponse{}, err
+	}
+	return a.service.Members().List(req)
+}
+
+// GetMemberProfile returns a member with every linked FD (SRS §51.3).
+func (a *App) GetMemberProfile(id int64) (api.MemberProfile, error) {
+	if err := a.ready(); err != nil {
+		return api.MemberProfile{}, err
+	}
+	return a.service.Members().GetProfile(id)
+}
+
+// SaveMember creates or updates a member record (SRS §50).
+func (a *App) SaveMember(req api.SaveMemberRequest) (api.Member, error) {
+	if err := a.ready(); err != nil {
+		return api.Member{}, err
+	}
+	return a.service.Members().Save(req)
+}
+
+// PreviewMemberImport validates an Excel member file without saving anything
+// and returns the import summary (SRS §52.3).
+func (a *App) PreviewMemberImport(path string) (api.MemberImportPreview, error) {
+	if err := a.ready(); err != nil {
+		return api.MemberImportPreview{}, err
+	}
+	return a.service.Members().PreviewImport(path)
+}
+
+// CommitMemberImport re-validates and imports the member records from an
+// Excel file, skipping existing GEN Nos. (SRS §52.4).
+func (a *App) CommitMemberImport(path string) (api.MemberImportResult, error) {
+	if err := a.ready(); err != nil {
+		return api.MemberImportResult{}, err
+	}
+	return a.service.Members().CommitImport(path)
+}
+
+// PickMemberImportPath opens the native open dialog for choosing the Excel
+// member file. An empty string means the dialog was cancelled.
+func (a *App) PickMemberImportPath() (string, error) {
+	if a.ctx == nil {
+		return "", domain.ErrInternal
+	}
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Choose Member Excel File",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Excel Files (*.xlsx)", Pattern: "*.xlsx"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return "", domain.ErrInternal
+	}
+	return path, nil
 }

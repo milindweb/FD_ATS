@@ -39,12 +39,12 @@ func AddDays(t time.Time, n int) time.Time {
 	return t.UTC().AddDate(0, 0, n)
 }
 
-// PeriodForYear builds the FD numbering period key for a year (SRS §11).
-func PeriodForYear(year int) string {
-	return fmt.Sprintf("%02d", year%100)
-}
+// FDSequenceKey is the single fd_sequence row allocated for FD numbers
+// (SRS §11: one global counter, no year period).
+const FDSequenceKey = "GLOBAL"
 
-// FormatFDNumber builds an FD number such as FD-26-001 (SRS §11).
-func FormatFDNumber(period string, sequence int) string {
-	return fmt.Sprintf("FD-%s-%03d", period, sequence)
+// FormatFDNumber builds an FD number such as FD-1 (SRS §11: sequential
+// FD-N across the whole system).
+func FormatFDNumber(sequence int) string {
+	return fmt.Sprintf("FD-%d", sequence)
 }

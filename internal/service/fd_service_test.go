@@ -17,6 +17,10 @@ import (
 // fixedNow is the deterministic "today" used by every test: 06/10/2026.
 var fixedNow = time.Date(2026, 10, 6, 10, 0, 0, 0, time.UTC)
 
+// defaultMemberID is the member created by newTestService; baseRequest and
+// maturedRequest attach their FDs to it.
+var defaultMemberID int64
+
 func newTestService(t *testing.T) *service.FDService {
 	t.Helper()
 	db, err := repo.Open(t.TempDir())
@@ -30,16 +34,31 @@ func newTestService(t *testing.T) *service.FDService {
 		t.Fatalf("new service: %v", err)
 	}
 	svc.SetClock(func() time.Time { return fixedNow })
+
+	m, err := svc.Members().Save(api.SaveMemberRequest{GENNo: "CUST-001", Name: "ABC"})
+	if err != nil {
+		t.Fatalf("create default member: %v", err)
+	}
+	defaultMemberID = m.ID
 	return svc
+}
+
+// memberFor creates an additional member and returns its ID.
+func memberFor(t *testing.T, svc *service.FDService, gen, name string) int64 {
+	t.Helper()
+	m, err := svc.Members().Save(api.SaveMemberRequest{GENNo: gen, Name: name})
+	if err != nil {
+		t.Fatalf("create member %s: %v", gen, err)
+	}
+	return m.ID
 }
 
 func baseRequest() api.PreviewRequest {
 	return api.PreviewRequest{
-		CustomerName:   "ABC",
-		CustomerNumber: "CUST-001",
-		Principal:      100000,
-		StartDate:      "2026-10-01",
-		TenureDays:     365,
+		MemberID:   defaultMemberID,
+		Principal:  100000,
+		StartDate:  "2026-10-01",
+		TenureDays: 365,
 	}
 }
 
@@ -73,35 +92,43 @@ func TestCreateAssignsSequentialFDNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create 1: %v", err)
 	}
-	if first.FDNumber != "FD-26-001" {
-		t.Errorf("first number=%s, want FD-26-001", first.FDNumber)
+	if first.FDNumber != "FD-1" {
+		t.Errorf("first number=%s, want FD-1", first.FDNumber)
 	}
 	if first.Status != domain.StatusActive {
 		t.Errorf("status=%s, want ACTIVE", first.Status)
 	}
 
 	req2 := baseRequest()
-	req2.CustomerName = "PQR"
+	req2.MemberID = memberFor(t, svc, "CUST-002", "PQR")
 	second, err := svc.Create(req2)
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
 	}
-	if second.FDNumber != "FD-26-002" {
-		t.Errorf("second number=%s, want FD-26-002", second.FDNumber)
+	if second.FDNumber != "FD-2" {
+		t.Errorf("second number=%s, want FD-2", second.FDNumber)
 	}
 }
 
-func TestCreateUsesStartDateYearForPeriod(t *testing.T) {
+// FD-N numbers come from one global sequence regardless of the start year
+// (SRS §11: no year component).
+func TestCreateUsesGlobalSequenceAcrossStartYears(t *testing.T) {
 	svc := newTestService(t)
 
 	req := baseRequest()
-	req.StartDate = "2027-01-15"
-	fd, err := svc.Create(req)
-	if err != nil {
-		t.Fatalf("create: %v", err)
+	req.StartDate = "2026-10-01"
+	if _, err := svc.Create(req); err != nil {
+		t.Fatalf("create 1: %v", err)
 	}
-	if fd.FDNumber != "FD-27-001" {
-		t.Errorf("number=%s, want FD-27-001", fd.FDNumber)
+
+	req2 := baseRequest()
+	req2.StartDate = "2027-01-15"
+	fd, err := svc.Create(req2)
+	if err != nil {
+		t.Fatalf("create 2: %v", err)
+	}
+	if fd.FDNumber != "FD-2" {
+		t.Errorf("number=%s, want FD-2 (global sequence continues across years)", fd.FDNumber)
 	}
 }
 
@@ -134,8 +161,7 @@ func TestCreateValidationMessages(t *testing.T) {
 		mut  func(*api.PreviewRequest)
 		want error
 	}{
-		{"missing name", func(r *api.PreviewRequest) { r.CustomerName = " " }, domain.ErrCustomerNameRequired},
-		{"missing number", func(r *api.PreviewRequest) { r.CustomerNumber = "" }, domain.ErrCustomerNumberRequired},
+		{"missing member", func(r *api.PreviewRequest) { r.MemberID = 0 }, domain.ErrMemberRequired},
 		{"zero amount", func(r *api.PreviewRequest) { r.Principal = 0 }, domain.ErrInvalidAmount},
 		{"negative amount", func(r *api.PreviewRequest) { r.Principal = -500 }, domain.ErrInvalidAmount},
 		{"missing start", func(r *api.PreviewRequest) { r.StartDate = "" }, domain.ErrStartDateRequired},
@@ -167,12 +193,11 @@ func TestEditFDUpdatesActiveFD(t *testing.T) {
 	}
 
 	edited, err := svc.EditFD(api.EditFDRequest{
-		FDNumber:       created.FDNumber,
-		CustomerName:   "Renamed Member",
-		CustomerNumber: "CUST-999",
-		Principal:      200000,
-		StartDate:      "2026-10-01",
-		TenureDays:     365,
+		FDNumber:   created.FDNumber,
+		MemberID:   memberFor(t, svc, "CUST-999", "Renamed Member"),
+		Principal:  200000,
+		StartDate:  "2026-10-01",
+		TenureDays: 365,
 	})
 	if err != nil {
 		t.Fatalf("edit: %v", err)
@@ -214,7 +239,7 @@ func TestEditFDBlockedOnClosedFD(t *testing.T) {
 	}
 
 	_, err = svc.EditFD(api.EditFDRequest{
-		FDNumber: created.FDNumber, CustomerName: "X", CustomerNumber: "Y",
+		FDNumber: created.FDNumber, MemberID: defaultMemberID,
 		Principal: 1, StartDate: "2026-10-01", TenureDays: 1,
 	})
 	if !errors.Is(err, domain.ErrEditClosed) {
@@ -232,7 +257,7 @@ func TestEditFDValidation(t *testing.T) {
 
 	base := func() api.EditFDRequest {
 		return api.EditFDRequest{
-			FDNumber: created.FDNumber, CustomerName: "ABC", CustomerNumber: "C-1",
+			FDNumber: created.FDNumber, MemberID: defaultMemberID,
 			Principal: 100000, StartDate: "2026-10-01", TenureDays: 365,
 		}
 	}
@@ -245,19 +270,19 @@ func TestEditFDValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("name required", func(t *testing.T) {
+	t.Run("member required", func(t *testing.T) {
 		req := base()
-		req.CustomerName = "  "
-		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrCustomerNameRequired) {
-			t.Errorf("err=%v, want ErrCustomerNameRequired", err)
+		req.MemberID = 0
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrMemberRequired) {
+			t.Errorf("err=%v, want ErrMemberRequired", err)
 		}
 	})
 
-	t.Run("number required", func(t *testing.T) {
+	t.Run("member not found", func(t *testing.T) {
 		req := base()
-		req.CustomerNumber = ""
-		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrCustomerNumberRequired) {
-			t.Errorf("err=%v, want ErrCustomerNumberRequired", err)
+		req.MemberID = 99999
+		if _, err := svc.EditFD(req); !errors.Is(err, domain.ErrMemberNotFound) {
+			t.Errorf("err=%v, want ErrMemberNotFound", err)
 		}
 	})
 
@@ -289,23 +314,21 @@ func TestEditFDValidation(t *testing.T) {
 func TestListSearchAndFilters(t *testing.T) {
 	svc := newTestService(t)
 
-	// FD-26-001: ABC, active, matures 2027-10-01.
-	// FD-26-002: XYZ, active, short tenure matures 2026-10-10 (maturing soon).
-	// FD-26-003: PQR, closed early.
+	// FD-1: ABC, active, matures 2027-10-01.
+	// FD-2: XYZ, active, short tenure matures 2026-10-10 (maturing soon).
+	// FD-3: PQR, closed early.
 	req1 := baseRequest()
 	if _, err := svc.Create(req1); err != nil {
 		t.Fatal(err)
 	}
 	req2 := baseRequest()
-	req2.CustomerName = "XYZ"
-	req2.CustomerNumber = "CUST-002"
+	req2.MemberID = memberFor(t, svc, "CUST-002", "XYZ")
 	req2.TenureDays = 9 // matures 2026-10-10, within 30 days
 	if _, err := svc.Create(req2); err != nil {
 		t.Fatal(err)
 	}
 	req3 := baseRequest()
-	req3.CustomerName = "PQR"
-	req3.CustomerNumber = "CUST-003"
+	req3.MemberID = memberFor(t, svc, "CUST-003", "PQR")
 	fd3, err := svc.Create(req3)
 	if err != nil {
 		t.Fatal(err)
@@ -317,16 +340,16 @@ func TestListSearchAndFilters(t *testing.T) {
 	}
 
 	t.Run("search by fd number", func(t *testing.T) {
-		res, err := svc.List(api.ListRequest{Search: "FD-26-001", Filter: "ALL"})
+		res, err := svc.List(api.ListRequest{Search: "FD-1", Filter: "ALL"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Total != 1 || res.Items[0].FDNumber != "FD-26-001" {
+		if res.Total != 1 || res.Items[0].FDNumber != "FD-1" {
 			t.Errorf("total=%d items=%+v", res.Total, res.Items)
 		}
 	})
 
-	t.Run("search by customer name is case insensitive", func(t *testing.T) {
+	t.Run("search by member name is case insensitive", func(t *testing.T) {
 		res, err := svc.List(api.ListRequest{Search: "xyz"})
 		if err != nil {
 			t.Fatal(err)
@@ -336,7 +359,7 @@ func TestListSearchAndFilters(t *testing.T) {
 		}
 	})
 
-	t.Run("search by customer number", func(t *testing.T) {
+	t.Run("search by member GEN number", func(t *testing.T) {
 		res, err := svc.List(api.ListRequest{Search: "CUST-003"})
 		if err != nil {
 			t.Fatal(err)
@@ -371,7 +394,7 @@ func TestListSearchAndFilters(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Total != 1 || res.Items[0].FDNumber != "FD-26-002" {
+		if res.Total != 1 || res.Items[0].FDNumber != "FD-2" {
 			t.Errorf("maturing total=%d items=%+v", res.Total, res.Items)
 		}
 	})
@@ -449,13 +472,13 @@ func TestUpcomingMaturities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Default window is today .. +90 days: only FD-26-002 (matures 2026-10-10)
-	// falls inside; FD-26-001 matures 2027-10-01, far beyond it.
+	// Default window is today .. +90 days: only FD-2 (matures 2026-10-10)
+	// falls inside; FD-1 matures 2027-10-01, far beyond it.
 	if len(upcoming) != 1 {
 		t.Fatalf("default window len=%d, want 1", len(upcoming))
 	}
-	if upcoming[0].FDNumber != "FD-26-002" || upcoming[0].DaysRemaining != 4 {
-		t.Errorf("first=%+v, want FD-26-002 with 4 days remaining", upcoming[0])
+	if upcoming[0].FDNumber != "FD-2" || upcoming[0].DaysRemaining != 4 {
+		t.Errorf("first=%+v, want FD-2 with 4 days remaining", upcoming[0])
 	}
 
 	// An explicit range can reach further out (SRS §28 custom range).
@@ -466,8 +489,8 @@ func TestUpcomingMaturities(t *testing.T) {
 	if len(upcoming) != 2 {
 		t.Fatalf("custom range len=%d, want 2", len(upcoming))
 	}
-	if upcoming[0].FDNumber != "FD-26-002" || upcoming[1].FDNumber != "FD-26-001" {
-		t.Errorf("order=%s,%s, want FD-26-002,FD-26-001", upcoming[0].FDNumber, upcoming[1].FDNumber)
+	if upcoming[0].FDNumber != "FD-2" || upcoming[1].FDNumber != "FD-1" {
+		t.Errorf("order=%s,%s, want FD-2,FD-1", upcoming[0].FDNumber, upcoming[1].FDNumber)
 	}
 }
 
@@ -511,8 +534,8 @@ func TestRenewPrincipalOnly(t *testing.T) {
 	if res.NewFD.StartDate != "2026-10-01" {
 		t.Errorf("new start=%s, want 2026-10-01", res.NewFD.StartDate)
 	}
-	if res.NewFD.FDNumber != "FD-26-001" {
-		t.Errorf("new number=%s, want FD-26-001", res.NewFD.FDNumber)
+	if res.NewFD.FDNumber != "FD-2" {
+		t.Errorf("new number=%s, want FD-2", res.NewFD.FDNumber)
 	}
 
 	// History of the old FD contains OPEN + RENEW.
@@ -1057,7 +1080,7 @@ func TestExportReportCreatesXlsx(t *testing.T) {
 		t.Fatal(err)
 	}
 	req2 := baseRequest()
-	req2.CustomerName = "XYZ"
+	req2.MemberID = memberFor(t, svc, "CUST-002", "XYZ")
 	closed, err := svc.Create(req2)
 	if err != nil {
 		t.Fatal(err)
@@ -1071,6 +1094,7 @@ func TestExportReportCreatesXlsx(t *testing.T) {
 		api.ReportRegister: 2,
 		api.ReportActive:   1,
 		api.ReportClosed:   1,
+		api.ReportMembers:  2, // default member + XYZ; no unassigned FDs
 	}
 	for kind, wantRows := range kinds {
 		path := filepath.Join(dir, kind+".xlsx")

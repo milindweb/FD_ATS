@@ -28,6 +28,7 @@ type FDService struct {
 	history *repo.HistoryRepo
 	slabs   *repo.SlabRepo
 	auth    *repo.AuthRepo
+	members *MemberService
 	now     func() time.Time
 }
 
@@ -43,9 +44,13 @@ func NewFDService(db *sql.DB) (*FDService, error) {
 		history: repo.NewHistoryRepo(db),
 		slabs:   slabs,
 		auth:    repo.NewAuthRepo(db),
+		members: NewMemberService(db),
 		now:     time.Now,
 	}, nil
 }
+
+// Members returns the member master service (SRS §50–§52).
+func (s *FDService) Members() *MemberService { return s.members }
 
 // SetClock replaces the wall clock (tests only).
 func (s *FDService) SetClock(now func() time.Time) {
@@ -69,9 +74,15 @@ func (s *FDService) Preview(req api.PreviewRequest) (api.Calculation, error) {
 	return toCalculation(res), nil
 }
 
-// Create validates, calculates and saves a new FD (SRS §10, §11).
+// Create validates, calculates and saves a new FD (SRS §10, §11). The FD
+// belongs to the selected member; its name/GEN copies are taken from the
+// member record (§53).
 func (s *FDService) Create(req api.PreviewRequest) (api.FD, error) {
 	if err := validateCreate(req); err != nil {
+		return api.FD{}, err
+	}
+	member, err := s.members.Get(req.MemberID)
+	if err != nil {
 		return api.FD{}, err
 	}
 	res, err := s.computeFromRequest(req)
@@ -80,11 +91,13 @@ func (s *FDService) Create(req api.PreviewRequest) (api.FD, error) {
 	}
 
 	now := s.nowUTC()
-	period := domain.PeriodForYear(res.StartDate.Year())
+	memberID := member.ID
 
 	fd := domain.FixedDeposit{
-		CustomerName:   strings.TrimSpace(req.CustomerName),
-		CustomerNumber: strings.TrimSpace(req.CustomerNumber),
+		MemberID:       &memberID,
+		FDFormNo:       strings.TrimSpace(req.FDFormNo),
+		CustomerName:   member.Name,
+		CustomerNumber: member.GENNo,
 		Principal:      res.Principal,
 		StartDate:      domain.FormatDate(res.StartDate),
 		TenureDays:     res.TenureDays,
@@ -97,7 +110,7 @@ func (s *FDService) Create(req api.PreviewRequest) (api.FD, error) {
 		UpdatedAt:      formatTimestamp(now),
 	}
 
-	number, err := s.fds.InsertWithNumber(fd, period, insertAttempts)
+	number, err := s.fds.InsertWithNumber(fd, insertAttempts)
 	if err != nil {
 		return api.FD{}, err
 	}
@@ -119,6 +132,8 @@ func (s *FDService) Create(req api.PreviewRequest) (api.FD, error) {
 
 // EditFD updates the editable fields of an ACTIVE FD and recomputes the
 // derived rate/interest/maturity amounts. Closed FDs are locked (audit).
+// The member link can be changed here, which is also how an unassigned FD
+// gets linked later (SRS §53).
 func (s *FDService) EditFD(req api.EditFDRequest) (api.FD, error) {
 	fd, err := s.fds.Get(strings.TrimSpace(req.FDNumber))
 	if err != nil {
@@ -127,20 +142,29 @@ func (s *FDService) EditFD(req api.EditFDRequest) (api.FD, error) {
 	if fd.Status != domain.StatusActive {
 		return api.FD{}, domain.ErrEditClosed
 	}
+	if req.MemberID <= 0 {
+		return api.FD{}, domain.ErrMemberRequired
+	}
+	member, err := s.members.Get(req.MemberID)
+	if err != nil {
+		return api.FD{}, err
+	}
 
 	res, err := s.computeFromRequest(api.PreviewRequest{
-		CustomerName:   req.CustomerName,
-		CustomerNumber: req.CustomerNumber,
-		Principal:      req.Principal,
-		StartDate:      req.StartDate,
-		TenureDays:     req.TenureDays,
+		MemberID:   req.MemberID,
+		Principal:  req.Principal,
+		StartDate:  req.StartDate,
+		TenureDays: req.TenureDays,
 	})
 	if err != nil {
 		return api.FD{}, err
 	}
 
-	fd.CustomerName = strings.TrimSpace(req.CustomerName)
-	fd.CustomerNumber = strings.TrimSpace(req.CustomerNumber)
+	memberID := member.ID
+	fd.MemberID = &memberID
+	fd.FDFormNo = strings.TrimSpace(req.FDFormNo)
+	fd.CustomerName = member.Name
+	fd.CustomerNumber = member.GENNo
 	fd.Principal = res.Principal
 	fd.StartDate = domain.FormatDate(res.StartDate)
 	fd.TenureDays = res.TenureDays
@@ -179,11 +203,8 @@ func (s *FDService) computeFromRequest(req api.PreviewRequest) (calc.Result, err
 }
 
 func validateCreate(req api.PreviewRequest) error {
-	if strings.TrimSpace(req.CustomerName) == "" {
-		return domain.ErrCustomerNameRequired
-	}
-	if strings.TrimSpace(req.CustomerNumber) == "" {
-		return domain.ErrCustomerNumberRequired
+	if req.MemberID <= 0 {
+		return domain.ErrMemberRequired
 	}
 	if req.Principal <= 0 {
 		return domain.ErrInvalidAmount
@@ -442,9 +463,17 @@ func (s *FDService) Renew(req api.RenewRequest) (api.RenewResult, error) {
 	newInterest := calc.SimpleInterest(newPrincipal, newRate, req.TenureDays)
 
 	now := s.nowUTC()
-	period := domain.PeriodForYear(start.Year())
 
+	// The renewed FD inherits the member link of the FD it replaces; its
+	// FD Form No. starts empty (SRS §53).
+	var newMemberID *int64
+	if fd.MemberID != nil {
+		v := *fd.MemberID
+		newMemberID = &v
+	}
 	newFD := domain.FixedDeposit{
+		MemberID:       newMemberID,
+		FDFormNo:       "",
 		CustomerName:   fd.CustomerName,
 		CustomerNumber: fd.CustomerNumber,
 		Principal:      newPrincipal,
@@ -460,7 +489,7 @@ func (s *FDService) Renew(req api.RenewRequest) (api.RenewResult, error) {
 		UpdatedAt:      formatTimestamp(now),
 	}
 
-	newNumber, err := s.fds.InsertWithNumber(newFD, period, insertAttempts)
+	newNumber, err := s.fds.InsertWithNumber(newFD, insertAttempts)
 	if err != nil {
 		return api.RenewResult{}, err
 	}
@@ -765,6 +794,8 @@ func formatTimestamp(t time.Time) string {
 func toFD(fd domain.FixedDeposit) api.FD {
 	return api.FD{
 		FDNumber:        fd.FDNumber,
+		MemberID:        fd.MemberID,
+		FDFormNo:        fd.FDFormNo,
 		CustomerName:    fd.CustomerName,
 		CustomerNumber:  fd.CustomerNumber,
 		Principal:       fd.Principal,

@@ -14,8 +14,20 @@ export function ChangeCredentials(arg1) {
   return window['go']['main']['App']['ChangeCredentials'](arg1);
 }
 
+export function ChangePassword(arg1) {
+  return window['go']['main']['App']['ChangePassword'](arg1);
+}
+
+export function ChangeUsername(arg1) {
+  return window['go']['main']['App']['ChangeUsername'](arg1);
+}
+
 export function CloseFD(arg1) {
   return window['go']['main']['App']['CloseFD'](arg1);
+}
+
+export function CommitMemberImport(arg1) {
+  return window['go']['main']['App']['CommitMemberImport'](arg1);
 }
 
 export function CreateFD(arg1) {
@@ -42,12 +54,20 @@ export function GetFD(arg1) {
   return window['go']['main']['App']['GetFD'](arg1);
 }
 
+export function GetMemberProfile(arg1) {
+  return window['go']['main']['App']['GetMemberProfile'](arg1);
+}
+
 export function GetRateSlabs() {
   return window['go']['main']['App']['GetRateSlabs']();
 }
 
 export function ListFDs(arg1) {
   return window['go']['main']['App']['ListFDs'](arg1);
+}
+
+export function ListMembers(arg1) {
+  return window['go']['main']['App']['ListMembers'](arg1);
 }
 
 export function LoadSampleData() {
@@ -70,6 +90,10 @@ export function PickBackupPath() {
   return window['go']['main']['App']['PickBackupPath']();
 }
 
+export function PickMemberImportPath() {
+  return window['go']['main']['App']['PickMemberImportPath']();
+}
+
 export function PickReportPath(arg1) {
   return window['go']['main']['App']['PickReportPath'](arg1);
 }
@@ -84,6 +108,10 @@ export function PreviewClosure(arg1) {
 
 export function PreviewFD(arg1) {
   return window['go']['main']['App']['PreviewFD'](arg1);
+}
+
+export function PreviewMemberImport(arg1) {
+  return window['go']['main']['App']['PreviewMemberImport'](arg1);
 }
 
 export function PreviewReport(arg1) {
@@ -108,6 +136,10 @@ export function RestoreDatabase(arg1) {
 
 export function ReverseRenewal(arg1) {
   return window['go']['main']['App']['ReverseRenewal'](arg1);
+}
+
+export function SaveMember(arg1) {
+  return window['go']['main']['App']['SaveMember'](arg1);
 }
 
 export function SaveRateSlabs(arg1) {

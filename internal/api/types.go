@@ -5,24 +5,27 @@ package api
 
 import "fdats/internal/domain"
 
-// PreviewRequest calculates an FD without saving it (SRS §10).
+// PreviewRequest calculates an FD without saving it (SRS §10). The member
+// is mandatory: the FD's readable name/GEN copies come from the selected
+// member, and FD Form No. is the optional manual form number (§12).
 type PreviewRequest struct {
-	CustomerName   string `json:"customerName"`
-	CustomerNumber string `json:"customerNumber"`
-	Principal      int64  `json:"principal"`
-	StartDate      string `json:"startDate"`
-	TenureDays     int    `json:"tenureDays"`
+	MemberID   int64  `json:"memberId"`
+	FDFormNo   string `json:"fdFormNo"`
+	Principal  int64  `json:"principal"`
+	StartDate  string `json:"startDate"`
+	TenureDays int    `json:"tenureDays"`
 }
 
 // EditFDRequest updates the editable fields of an existing ACTIVE FD;
-// derived amounts are recomputed by the service.
+// derived amounts are recomputed by the service. MemberID relinks the FD
+// (SRS §53); an empty FDFormNo clears the manual form number.
 type EditFDRequest struct {
-	FDNumber       string `json:"fdNumber"`
-	CustomerName   string `json:"customerName"`
-	CustomerNumber string `json:"customerNumber"`
-	Principal      int64  `json:"principal"`
-	StartDate      string `json:"startDate"`
-	TenureDays     int    `json:"tenureDays"`
+	FDNumber   string `json:"fdNumber"`
+	MemberID   int64  `json:"memberId"`
+	FDFormNo   string `json:"fdFormNo"`
+	Principal  int64  `json:"principal"`
+	StartDate  string `json:"startDate"`
+	TenureDays int    `json:"tenureDays"`
 }
 
 // Calculation is a full interest/maturity calculation result (SRS §10).
@@ -40,6 +43,8 @@ type Calculation struct {
 // FD is the FD master record as seen by the UI (SRS §12).
 type FD struct {
 	FDNumber        string              `json:"fdNumber"`
+	MemberID        *int64              `json:"memberId,omitempty"`
+	FDFormNo        string              `json:"fdFormNo"`
 	CustomerName    string              `json:"customerName"`
 	CustomerNumber  string              `json:"customerNumber"`
 	Principal       int64               `json:"principal"`
@@ -175,6 +180,7 @@ const (
 	ReportMaturity = "MATURITY"
 	ReportActive   = "ACTIVE"
 	ReportClosed   = "CLOSED"
+	ReportMembers  = "MEMBERS"
 )
 
 // ReportRequest selects a report and its export location (SRS §29).
@@ -229,6 +235,19 @@ type ChangeCredentialsRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+// ChangeUsernameRequest replaces just the username (SRS §30.2: the current
+// password is always required).
+type ChangeUsernameRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewUsername     string `json:"newUsername"`
+}
+
+// ChangePasswordRequest replaces just the password (SRS §30.2).
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // ResetCredentialsRequest recovers a forgotten login using the recovery code.
 type ResetCredentialsRequest struct {
 	RecoveryCode string `json:"recoveryCode"`
@@ -240,4 +259,115 @@ type ResetCredentialsRequest struct {
 type AuthInfo struct {
 	Username     string `json:"username"`
 	RecoveryCode string `json:"recoveryCode"`
+}
+
+// Member is the member master record as seen by the UI, including the
+// active-FD aggregates shown in the member list (SRS §50, §51.2).
+type Member struct {
+	ID                  int64  `json:"id"`
+	GENNo               string `json:"genNo"`
+	Name                string `json:"name"`
+	DOB                 string `json:"dob"`
+	Mobile              string `json:"mobile"`
+	Email               string `json:"email"`
+	PresentAddress      string `json:"presentAddress"`
+	PermanentAddress    string `json:"permanentAddress"`
+	EmployerName        string `json:"employerName"`
+	Department          string `json:"department"`
+	Designation         string `json:"designation"`
+	TokenNo             string `json:"tokenNo"`
+	NomineeName         string `json:"nomineeName"`
+	NomineeRelationship string `json:"nomineeRelationship"`
+	Aadhaar             string `json:"aadhaar"`
+	PAN                 string `json:"pan"`
+	BankName            string `json:"bankName"`
+	AccountNo           string `json:"accountNo"`
+	IFSC                string `json:"ifsc"`
+	ProfileRemarks      string `json:"profileRemarks"`
+	CreatedAt           string `json:"createdAt"`
+	UpdatedAt           string `json:"updatedAt"`
+	ActiveFDCount       int    `json:"activeFdCount"`
+	ActiveFDAmount      int64  `json:"activeFdAmount"`
+}
+
+// SaveMemberRequest creates (ID = 0) or updates a member (SRS §50).
+// GEN No. and Name are mandatory.
+type SaveMemberRequest struct {
+	ID                  int64  `json:"id"`
+	GENNo               string `json:"genNo"`
+	Name                string `json:"name"`
+	DOB                 string `json:"dob"`
+	Mobile              string `json:"mobile"`
+	Email               string `json:"email"`
+	PresentAddress      string `json:"presentAddress"`
+	PermanentAddress    string `json:"permanentAddress"`
+	EmployerName        string `json:"employerName"`
+	Department          string `json:"department"`
+	Designation         string `json:"designation"`
+	TokenNo             string `json:"tokenNo"`
+	NomineeName         string `json:"nomineeName"`
+	NomineeRelationship string `json:"nomineeRelationship"`
+	Aadhaar             string `json:"aadhaar"`
+	PAN                 string `json:"pan"`
+	BankName            string `json:"bankName"`
+	AccountNo           string `json:"accountNo"`
+	IFSC                string `json:"ifsc"`
+	ProfileRemarks      string `json:"profileRemarks"`
+}
+
+// MemberListRequest drives the member list (SRS §51.1, §51.2).
+type MemberListRequest struct {
+	Search   string `json:"search"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+}
+
+// MemberListResponse is one page of member results.
+type MemberListResponse struct {
+	Items    []Member `json:"items"`
+	Total    int      `json:"total"`
+	Page     int      `json:"page"`
+	PageSize int      `json:"pageSize"`
+}
+
+// MemberProfile is a member together with every FD linked to it (SRS §51.3).
+type MemberProfile struct {
+	Member Member `json:"member"`
+	FDs    []FD   `json:"fds"`
+}
+
+// Row statuses in an import preview (SRS §52.3, §52.4).
+const (
+	ImportRowNew       = "new"       // valid and not yet in the system
+	ImportRowExisting  = "existing"  // GEN No. already in the system — will be skipped
+	ImportRowDuplicate = "duplicate" // GEN No. repeated within the file
+	ImportRowInvalid   = "invalid"   // missing mandatory data or bad format
+)
+
+// MemberImportRow reports the outcome for one Excel data row (SRS §52.3).
+type MemberImportRow struct {
+	Row    int    `json:"row"` // Excel row number
+	GENNo  string `json:"genNo"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// MemberImportPreview is the validation summary shown before importing
+// (SRS §52.3). Nothing is saved until the preview is accepted.
+type MemberImportPreview struct {
+	Total           int               `json:"total"`
+	Valid           int               `json:"valid"`
+	DuplicateGEN    int               `json:"duplicateGen"`
+	MissingMandatory int              `json:"missingMandatory"`
+	Invalid         int               `json:"invalid"`
+	Existing        int               `json:"existing"`
+	Rows            []MemberImportRow `json:"rows"`
+}
+
+// MemberImportResult confirms a completed import (SRS §52.4).
+type MemberImportResult struct {
+	Imported int `json:"imported"`
+	Skipped  int `json:"skipped"`
+	Total    int `json:"total"`
 }

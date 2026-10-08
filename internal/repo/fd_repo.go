@@ -21,27 +21,33 @@ func NewFDRepo(db *sql.DB) *FDRepo { return &FDRepo{db: db} }
 
 func (r *FDRepo) DB() *sql.DB { return r.db }
 
-const fdColumns = `fd_number, customer_name, customer_number, principal, start_date,
+const fdColumns = `fd_number, member_id, fd_form_no, customer_name, customer_number, principal, start_date,
 	tenure_days, interest_rate, maturity_date, interest_amount, maturity_amount, status,
 	closure_date, closure_type, closure_remark, closure_rate, closure_days,
 	closure_interest, closure_payable, renewed_from, renewed_to, created_at, updated_at`
 
 func scanFD(scan func(dest ...any) error) (domain.FixedDeposit, error) {
 	var fd domain.FixedDeposit
-	var closureDate, closureType sql.NullString
+	var memberID sql.NullInt64
+	var closureDate, closureType, closureRemark sql.NullString
 	var closureRate sql.NullFloat64
 	var closureDays sql.NullInt64
 	var closureInterest, closurePayable sql.NullInt64
 	var renewedFrom, renewedTo sql.NullString
 
 	err := scan(
-		&fd.FDNumber, &fd.CustomerName, &fd.CustomerNumber, &fd.Principal, &fd.StartDate,
+		&fd.FDNumber, &memberID, &fd.FDFormNo, &fd.CustomerName, &fd.CustomerNumber, &fd.Principal, &fd.StartDate,
 		&fd.TenureDays, &fd.InterestRate, &fd.MaturityDate, &fd.InterestAmount, &fd.MaturityAmount,
-		&fd.Status, &closureDate, &closureType, &fd.ClosureRemark, &closureRate, &closureDays,
+		&fd.Status, &closureDate, &closureType, &closureRemark, &closureRate, &closureDays,
 		&closureInterest, &closurePayable, &renewedFrom, &renewedTo, &fd.CreatedAt, &fd.UpdatedAt,
 	)
 	if err != nil {
 		return fd, err
+	}
+	fd.ClosureRemark = closureRemark.String
+	if memberID.Valid {
+		v := memberID.Int64
+		fd.MemberID = &v
 	}
 	if closureDate.Valid {
 		fd.ClosureDate = &closureDate.String
@@ -84,15 +90,15 @@ func (r *FDRepo) Get(fdNumber string) (domain.FixedDeposit, error) {
 	return fd, err
 }
 
-// InsertWithNumber allocates an FD number for period and inserts the record
-// in one transaction, retrying if a concurrent writer took the number first.
-func (r *FDRepo) InsertWithNumber(fd domain.FixedDeposit, period string, attempts int) (string, error) {
+// InsertWithNumber allocates the next FD-N and inserts the record in one
+// transaction, retrying if a concurrent writer took the number first.
+func (r *FDRepo) InsertWithNumber(fd domain.FixedDeposit, attempts int) (string, error) {
 	if attempts < 1 {
 		attempts = 1
 	}
 	var lastErr error
 	for i := 0; i < attempts; i++ {
-		number, err := r.insertOnce(fd, period)
+		number, err := r.insertOnce(fd)
 		if err == nil {
 			return number, nil
 		}
@@ -105,7 +111,8 @@ func (r *FDRepo) InsertWithNumber(fd domain.FixedDeposit, period string, attempt
 	return "", fmt.Errorf("could not allocate an FD number after %d attempts: %w", attempts, lastErr)
 }
 
-func (r *FDRepo) insertOnce(fd domain.FixedDeposit, period string) (string, error) {
+func (r *FDRepo) insertOnce(fd domain.FixedDeposit) (string, error) {
+	period := domain.FDSequenceKey
 	tx, err := r.db.Begin()
 	if err != nil {
 		return "", err
@@ -129,10 +136,10 @@ func (r *FDRepo) insertOnce(fd domain.FixedDeposit, period string) (string, erro
 		}
 	}
 
-	fd.FDNumber = domain.FormatFDNumber(period, next)
+	fd.FDNumber = domain.FormatFDNumber(next)
 	if _, err := tx.Exec(`INSERT INTO fds (`+fdColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		fd.FDNumber, fd.CustomerName, fd.CustomerNumber, fd.Principal, fd.StartDate,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		fd.FDNumber, fd.MemberID, fd.FDFormNo, fd.CustomerName, fd.CustomerNumber, fd.Principal, fd.StartDate,
 		fd.TenureDays, fd.InterestRate, fd.MaturityDate, fd.InterestAmount, fd.MaturityAmount,
 		fd.Status, fd.ClosureDate, fd.ClosureType, fd.ClosureRemark, fd.ClosureRate, fd.ClosureDays,
 		fd.ClosureInterest, fd.ClosurePayable, fd.RenewedFrom, fd.RenewedTo, fd.CreatedAt, fd.UpdatedAt,
@@ -152,12 +159,12 @@ func (r *FDRepo) insertOnce(fd domain.FixedDeposit, period string) (string, erro
 // Update applies changes to an existing FD record.
 func (r *FDRepo) Update(fd domain.FixedDeposit) error {
 	res, err := r.db.Exec(`UPDATE fds SET
-		customer_name = ?, customer_number = ?, principal = ?, start_date = ?, tenure_days = ?,
+		member_id = ?, fd_form_no = ?, customer_name = ?, customer_number = ?, principal = ?, start_date = ?, tenure_days = ?,
 		interest_rate = ?, maturity_date = ?, interest_amount = ?, maturity_amount = ?, status = ?,
 		closure_date = ?, closure_type = ?, closure_remark = ?, closure_rate = ?, closure_days = ?,
 		closure_interest = ?, closure_payable = ?, renewed_from = ?, renewed_to = ?, updated_at = ?
 		WHERE fd_number = ?`,
-		fd.CustomerName, fd.CustomerNumber, fd.Principal, fd.StartDate, fd.TenureDays,
+		fd.MemberID, fd.FDFormNo, fd.CustomerName, fd.CustomerNumber, fd.Principal, fd.StartDate, fd.TenureDays,
 		fd.InterestRate, fd.MaturityDate, fd.InterestAmount, fd.MaturityAmount, fd.Status,
 		fd.ClosureDate, fd.ClosureType, fd.ClosureRemark, fd.ClosureRate, fd.ClosureDays,
 		fd.ClosureInterest, fd.ClosurePayable, fd.RenewedFrom, fd.RenewedTo, fd.UpdatedAt,
@@ -193,12 +200,12 @@ func (r *FDRepo) ReverseRenewal(reopened domain.FixedDeposit, withdrawnFDNumber 
 	}
 
 	if _, err := tx.Exec(`UPDATE fds SET
-		customer_name = ?, customer_number = ?, principal = ?, start_date = ?, tenure_days = ?,
+		member_id = ?, fd_form_no = ?, customer_name = ?, customer_number = ?, principal = ?, start_date = ?, tenure_days = ?,
 		interest_rate = ?, maturity_date = ?, interest_amount = ?, maturity_amount = ?, status = ?,
 		closure_date = ?, closure_type = ?, closure_remark = ?, closure_rate = ?, closure_days = ?,
 		closure_interest = ?, closure_payable = ?, renewed_from = ?, renewed_to = ?, updated_at = ?
 		WHERE fd_number = ?`,
-		reopened.CustomerName, reopened.CustomerNumber, reopened.Principal, reopened.StartDate, reopened.TenureDays,
+		reopened.MemberID, reopened.FDFormNo, reopened.CustomerName, reopened.CustomerNumber, reopened.Principal, reopened.StartDate, reopened.TenureDays,
 		reopened.InterestRate, reopened.MaturityDate, reopened.InterestAmount, reopened.MaturityAmount, reopened.Status,
 		reopened.ClosureDate, reopened.ClosureType, reopened.ClosureRemark, reopened.ClosureRate, reopened.ClosureDays,
 		reopened.ClosureInterest, reopened.ClosurePayable, reopened.RenewedFrom, reopened.RenewedTo, reopened.UpdatedAt,
@@ -397,14 +404,50 @@ func (r *FDRepo) ListByMaturityRange(fromISO, toISO string) ([]domain.FixedDepos
 	return items, rows.Err()
 }
 
+// UnassignedActiveSummary totals active FDs not linked to any member; the
+// member-wise report shows them as one "Unassigned" row (SRS §53).
+func (r *FDRepo) UnassignedActiveSummary() (int64, int64, error) {
+	var count, amount int64
+	err := r.db.QueryRow(
+		`SELECT COUNT(*), COALESCE(SUM(principal), 0) FROM fds
+		 WHERE member_id IS NULL AND status = ?`,
+		string(domain.StatusActive),
+	).Scan(&count, &amount)
+	if err != nil {
+		return 0, 0, err
+	}
+	return count, amount, nil
+}
+
+// ListByMember returns every FD linked to a member (SRS §51.3), oldest first.
+func (r *FDRepo) ListByMember(memberID int64) ([]domain.FixedDeposit, error) {
+	rows, err := r.db.Query(
+		"SELECT "+fdColumns+" FROM fds WHERE member_id = ? ORDER BY start_date ASC, fd_number ASC",
+		memberID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []domain.FixedDeposit
+	for rows.Next() {
+		fd, err := scanFD(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, fd)
+	}
+	return items, rows.Err()
+}
+
 func buildWhere(p ListParams) (string, []any) {
 	var clauses []string
 	var args []any
 
 	if s := strings.TrimSpace(p.Search); s != "" {
 		like := "%" + strings.ToLower(s) + "%"
-		clauses = append(clauses, "(LOWER(fd_number) LIKE ? OR LOWER(customer_name) LIKE ? OR LOWER(customer_number) LIKE ?)")
-		args = append(args, like, like, like)
+		clauses = append(clauses, "(LOWER(fd_number) LIKE ? OR LOWER(fd_form_no) LIKE ? OR LOWER(customer_name) LIKE ? OR LOWER(customer_number) LIKE ?)")
+		args = append(args, like, like, like, like)
 	}
 
 	switch strings.ToUpper(p.Filter) {

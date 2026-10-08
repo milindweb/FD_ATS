@@ -7,7 +7,7 @@ import (
 	"fdats/internal/domain"
 )
 
-// buildSheet turns FD records into report headings and rows (SRS §29.1–§29.4).
+// buildSheet turns report records into headings and rows (SRS §29.1–§29.6).
 func buildSheet(opts Options) ([]string, [][]any) {
 	switch opts.Kind {
 	case api.ReportMaturity:
@@ -16,6 +16,8 @@ func buildSheet(opts Options) ([]string, [][]any) {
 		return registerSheet(selectStatus(opts.FDs, domain.StatusActive), false)
 	case api.ReportClosed:
 		return registerSheet(selectStatus(opts.FDs, domain.StatusClosed), true)
+	case api.ReportMembers:
+		return membersSheet(opts)
 	default:
 		return registerSheet(opts.FDs, true)
 	}
@@ -52,8 +54,8 @@ func selectStatus(fds []domain.FixedDeposit, status domain.FDStatus) []domain.Fi
 
 func registerSheet(fds []domain.FixedDeposit, withClosure bool) ([]string, [][]any) {
 	headers := []string{
-		"FD Number", "Customer/Member", "Customer/Member Number", "Deposit Amount",
-		"Interest Rate", "Start Date", "Tenure (Days)", "Maturity Date",
+		"FD Number", "Member Name", "GEN No.", "Deposit Amount",
+		"Interest Rate", "Start Date", "Tenure", "Maturity Date",
 		"Interest Amount", "Maturity Amount", "Status",
 	}
 	if withClosure {
@@ -90,7 +92,7 @@ func registerSheet(fds []domain.FixedDeposit, withClosure bool) ([]string, [][]a
 
 func maturitySheet(opts Options) ([]string, [][]any) {
 	headers := []string{
-		"FD Number", "Customer/Member", "Deposit Amount", "Interest Rate",
+		"FD Number", "Member Name", "Deposit Amount", "Interest Rate",
 		"Maturity Date", "Days Remaining", "Maturity Amount", "Status",
 	}
 
@@ -107,6 +109,34 @@ func maturitySheet(opts Options) ([]string, [][]any) {
 			daysRemaining,
 			fd.MaturityAmount,
 			string(fd.Status),
+		})
+	}
+	return headers, rows
+}
+
+// membersSheet builds the member-wise FD summary (SRS §29.6). FDs with no
+// member link appear as one "Unassigned" row (SRS §53).
+func membersSheet(opts Options) ([]string, [][]any) {
+	headers := []string{
+		"GEN No.", "Member Name", "Designation", "Active FD Count", "Total Active FD Amount",
+	}
+	rows := make([][]any, 0, len(opts.Members)+1)
+	for _, m := range opts.Members {
+		rows = append(rows, []any{
+			m.GENNo,
+			m.Name,
+			m.Designation,
+			int64(m.ActiveFDCount),
+			m.ActiveFDAmount,
+		})
+	}
+	if opts.UnassignedActiveFDCount > 0 {
+		rows = append(rows, []any{
+			"Unassigned",
+			"",
+			"",
+			opts.UnassignedActiveFDCount,
+			opts.UnassignedActiveAmount,
 		})
 	}
 	return headers, rows

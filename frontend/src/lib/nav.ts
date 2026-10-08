@@ -11,7 +11,8 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: "grid" },
-  { to: "/new", label: "New FD", icon: "plus" },
+  { to: "/fds", label: "FD Master", icon: "banknote" },
+  { to: "/member", label: "Member", icon: "users" },
   { to: "/reports", label: "Reports", icon: "sheet" },
   { to: "/settings", label: "Settings", icon: "gear" },
 ];

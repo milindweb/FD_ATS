@@ -6,30 +6,38 @@ import {
   AppInfo,
   BackupDatabase,
   ChangeCredentials,
+  ChangePassword,
+  ChangeUsername,
   CloseFD,
+  CommitMemberImport,
   CreateFD,
   DashboardStats,
   EditFD,
   ExportReport,
   GetAuthInfo,
   GetFD,
+  GetMemberProfile,
   GetRateSlabs,
   ListFDs,
+  ListMembers,
   LoadSampleData,
   Login,
   Logout,
   MaturityChart,
   PickBackupPath,
+  PickMemberImportPath,
   PickReportPath,
   PickRestorePath,
   PreviewClosure,
   PreviewFD,
+  PreviewMemberImport,
   PreviewReport,
   RenewFD,
   ReopenFD,
   ResetCredentials,
   RestoreDatabase,
   ReverseRenewal,
+  SaveMember,
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,
@@ -57,11 +65,21 @@ export type ReportPreview = api.ReportPreview;
 export type MaturityBucket = api.MaturityBucket;
 export type LoginRequest = api.LoginRequest;
 export type ChangeCredentialsRequest = api.ChangeCredentialsRequest;
+export type ChangeUsernameRequest = api.ChangeUsernameRequest;
+export type ChangePasswordRequest = api.ChangePasswordRequest;
 export type ResetCredentialsRequest = api.ResetCredentialsRequest;
 export type AuthInfo = api.AuthInfo;
 export type SystemStatus = api.SystemStatus;
 export type UpcomingFD = api.UpcomingFD;
 export type UpcomingRequest = api.UpcomingRequest;
+export type Member = api.Member;
+export type SaveMemberRequest = api.SaveMemberRequest;
+export type MemberListRequest = api.MemberListRequest;
+export type MemberListResponse = api.MemberListResponse;
+export type MemberProfile = api.MemberProfile;
+export type MemberImportRow = api.MemberImportRow;
+export type MemberImportPreview = api.MemberImportPreview;
+export type MemberImportResult = api.MemberImportResult;
 export type RateSlab = domain.RateSlab;
 export type HistoryEntry = domain.HistoryEntry;
 export type AppInfo = brand.Info;
@@ -70,30 +88,38 @@ export {
   AppInfo,
   BackupDatabase,
   ChangeCredentials,
+  ChangePassword,
+  ChangeUsername,
   CloseFD,
+  CommitMemberImport,
   CreateFD,
   DashboardStats,
   EditFD,
   ExportReport,
   GetAuthInfo,
   GetFD,
+  GetMemberProfile,
   GetRateSlabs,
   ListFDs,
+  ListMembers,
   LoadSampleData,
   Login,
   Logout,
   MaturityChart,
   PickBackupPath,
+  PickMemberImportPath,
   PickReportPath,
   PickRestorePath,
   PreviewClosure,
   PreviewFD,
+  PreviewMemberImport,
   PreviewReport,
   RenewFD,
   ReopenFD,
   ResetCredentials,
   RestoreDatabase,
   ReverseRenewal,
+  SaveMember,
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,
@@ -120,6 +146,7 @@ export function SaveSlabs(slabs: RateSlab[]): Promise<void> {
   { kind: "MATURITY" as const, label: "Maturity Report", file: "Maturity_Report" },
   { kind: "ACTIVE" as const, label: "Active FD Report", file: "Active_FD_Report" },
   { kind: "CLOSED" as const, label: "Closed FD Report", file: "Closed_FD_Report" },
+  { kind: "MEMBERS" as const, label: "Member-wise FD Summary", file: "Member_Wise_Summary" },
 ];
 
 /** FD list filters (SRS §9.2). */

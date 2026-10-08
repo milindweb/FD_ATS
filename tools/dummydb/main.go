@@ -92,12 +92,15 @@ func main() {
 
 	created := make(map[string]api.FD, len(baseSpecs))
 	for _, sp := range baseSpecs {
+		member, err := svc.Members().Save(api.SaveMemberRequest{GENNo: sp.number, Name: sp.name})
+		if err != nil {
+			fatal(fmt.Errorf("create member %s: %w", sp.number, err))
+		}
 		fd, err := svc.Create(api.PreviewRequest{
-			CustomerName:   sp.name,
-			CustomerNumber: sp.number,
-			Principal:      sp.principal,
-			StartDate:      domain.FormatDate(now.AddDate(0, 0, -sp.startDaysAgo)),
-			TenureDays:     sp.tenureDays,
+			MemberID:   member.ID,
+			Principal:  sp.principal,
+			StartDate:  domain.FormatDate(now.AddDate(0, 0, -sp.startDaysAgo)),
+			TenureDays: sp.tenureDays,
 		})
 		if err != nil {
 			fatal(fmt.Errorf("create FD for %s: %w", sp.number, err))

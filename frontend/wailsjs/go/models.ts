@@ -56,6 +56,34 @@ export namespace api {
 	        this.newPassword = source["newPassword"];
 	    }
 	}
+	export class ChangePasswordRequest {
+	    currentPassword: string;
+	    newPassword: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChangePasswordRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentPassword = source["currentPassword"];
+	        this.newPassword = source["newPassword"];
+	    }
+	}
+	export class ChangeUsernameRequest {
+	    currentPassword: string;
+	    newUsername: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChangeUsernameRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.currentPassword = source["currentPassword"];
+	        this.newUsername = source["newUsername"];
+	    }
+	}
 	export class CloseRequest {
 	    fdNumber: string;
 	    closureDate: string;
@@ -132,8 +160,8 @@ export namespace api {
 	}
 	export class EditFDRequest {
 	    fdNumber: string;
-	    customerName: string;
-	    customerNumber: string;
+	    memberId: number;
+	    fdFormNo: string;
 	    principal: number;
 	    startDate: string;
 	    tenureDays: number;
@@ -145,8 +173,8 @@ export namespace api {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fdNumber = source["fdNumber"];
-	        this.customerName = source["customerName"];
-	        this.customerNumber = source["customerNumber"];
+	        this.memberId = source["memberId"];
+	        this.fdFormNo = source["fdFormNo"];
 	        this.principal = source["principal"];
 	        this.startDate = source["startDate"];
 	        this.tenureDays = source["tenureDays"];
@@ -154,6 +182,8 @@ export namespace api {
 	}
 	export class FD {
 	    fdNumber: string;
+	    memberId?: number;
+	    fdFormNo: string;
 	    customerName: string;
 	    customerNumber: string;
 	    principal: number;
@@ -183,6 +213,8 @@ export namespace api {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fdNumber = source["fdNumber"];
+	        this.memberId = source["memberId"];
+	        this.fdFormNo = source["fdFormNo"];
 	        this.customerName = source["customerName"];
 	        this.customerNumber = source["customerNumber"];
 	        this.principal = source["principal"];
@@ -324,9 +356,230 @@ export namespace api {
 	        this.amount = source["amount"];
 	    }
 	}
+	export class Member {
+	    id: number;
+	    genNo: string;
+	    name: string;
+	    dob: string;
+	    mobile: string;
+	    email: string;
+	    presentAddress: string;
+	    permanentAddress: string;
+	    employerName: string;
+	    department: string;
+	    designation: string;
+	    tokenNo: string;
+	    nomineeName: string;
+	    nomineeRelationship: string;
+	    aadhaar: string;
+	    pan: string;
+	    bankName: string;
+	    accountNo: string;
+	    ifsc: string;
+	    profileRemarks: string;
+	    createdAt: string;
+	    updatedAt: string;
+	    activeFdCount: number;
+	    activeFdAmount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Member(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.genNo = source["genNo"];
+	        this.name = source["name"];
+	        this.dob = source["dob"];
+	        this.mobile = source["mobile"];
+	        this.email = source["email"];
+	        this.presentAddress = source["presentAddress"];
+	        this.permanentAddress = source["permanentAddress"];
+	        this.employerName = source["employerName"];
+	        this.department = source["department"];
+	        this.designation = source["designation"];
+	        this.tokenNo = source["tokenNo"];
+	        this.nomineeName = source["nomineeName"];
+	        this.nomineeRelationship = source["nomineeRelationship"];
+	        this.aadhaar = source["aadhaar"];
+	        this.pan = source["pan"];
+	        this.bankName = source["bankName"];
+	        this.accountNo = source["accountNo"];
+	        this.ifsc = source["ifsc"];
+	        this.profileRemarks = source["profileRemarks"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.activeFdCount = source["activeFdCount"];
+	        this.activeFdAmount = source["activeFdAmount"];
+	    }
+	}
+	export class MemberImportRow {
+	    row: number;
+	    genNo: string;
+	    name: string;
+	    status: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberImportRow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.row = source["row"];
+	        this.genNo = source["genNo"];
+	        this.name = source["name"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	    }
+	}
+	export class MemberImportPreview {
+	    total: number;
+	    valid: number;
+	    duplicateGen: number;
+	    missingMandatory: number;
+	    invalid: number;
+	    existing: number;
+	    rows: MemberImportRow[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberImportPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.valid = source["valid"];
+	        this.duplicateGen = source["duplicateGen"];
+	        this.missingMandatory = source["missingMandatory"];
+	        this.invalid = source["invalid"];
+	        this.existing = source["existing"];
+	        this.rows = this.convertValues(source["rows"], MemberImportRow);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MemberImportResult {
+	    imported: number;
+	    skipped: number;
+	    total: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.imported = source["imported"];
+	        this.skipped = source["skipped"];
+	        this.total = source["total"];
+	    }
+	}
+	
+	export class MemberListRequest {
+	    search: string;
+	    page: number;
+	    pageSize: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberListRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.search = source["search"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	    }
+	}
+	export class MemberListResponse {
+	    items: Member[];
+	    total: number;
+	    page: number;
+	    pageSize: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberListResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], Member);
+	        this.total = source["total"];
+	        this.page = source["page"];
+	        this.pageSize = source["pageSize"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MemberProfile {
+	    member: Member;
+	    fds: FD[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MemberProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.member = this.convertValues(source["member"], Member);
+	        this.fds = this.convertValues(source["fds"], FD);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class PreviewRequest {
-	    customerName: string;
-	    customerNumber: string;
+	    memberId: number;
+	    fdFormNo: string;
 	    principal: number;
 	    startDate: string;
 	    tenureDays: number;
@@ -337,8 +590,8 @@ export namespace api {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.customerName = source["customerName"];
-	        this.customerNumber = source["customerNumber"];
+	        this.memberId = source["memberId"];
+	        this.fdFormNo = source["fdFormNo"];
 	        this.principal = source["principal"];
 	        this.startDate = source["startDate"];
 	        this.tenureDays = source["tenureDays"];
@@ -488,6 +741,56 @@ export namespace api {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.fdNumber = source["fdNumber"];
 	        this.remark = source["remark"];
+	    }
+	}
+	export class SaveMemberRequest {
+	    id: number;
+	    genNo: string;
+	    name: string;
+	    dob: string;
+	    mobile: string;
+	    email: string;
+	    presentAddress: string;
+	    permanentAddress: string;
+	    employerName: string;
+	    department: string;
+	    designation: string;
+	    tokenNo: string;
+	    nomineeName: string;
+	    nomineeRelationship: string;
+	    aadhaar: string;
+	    pan: string;
+	    bankName: string;
+	    accountNo: string;
+	    ifsc: string;
+	    profileRemarks: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SaveMemberRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.genNo = source["genNo"];
+	        this.name = source["name"];
+	        this.dob = source["dob"];
+	        this.mobile = source["mobile"];
+	        this.email = source["email"];
+	        this.presentAddress = source["presentAddress"];
+	        this.permanentAddress = source["permanentAddress"];
+	        this.employerName = source["employerName"];
+	        this.department = source["department"];
+	        this.designation = source["designation"];
+	        this.tokenNo = source["tokenNo"];
+	        this.nomineeName = source["nomineeName"];
+	        this.nomineeRelationship = source["nomineeRelationship"];
+	        this.aadhaar = source["aadhaar"];
+	        this.pan = source["pan"];
+	        this.bankName = source["bankName"];
+	        this.accountNo = source["accountNo"];
+	        this.ifsc = source["ifsc"];
+	        this.profileRemarks = source["profileRemarks"];
 	    }
 	}
 	export class SaveSlabsRequest {

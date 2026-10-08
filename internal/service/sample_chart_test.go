@@ -70,7 +70,6 @@ func TestPreviewReportReturnsSheetPreview(t *testing.T) {
 		t.Fatalf("create 1: %v", err)
 	}
 	second := baseRequest()
-	second.CustomerName = "PQR"
 	if _, err := svc.Create(second); err != nil {
 		t.Fatalf("create 2: %v", err)
 	}
@@ -93,8 +92,8 @@ func TestPreviewReportReturnsSheetPreview(t *testing.T) {
 			t.Errorf("row %d has %d cells, headers have %d", i, len(row), len(prev.Headers))
 		}
 	}
-	if prev.Rows[0][0] != "FD-26-001" {
-		t.Errorf("first cell=%q, want FD-26-001", prev.Rows[0][0])
+	if prev.Rows[0][0] != "FD-1" {
+		t.Errorf("first cell=%q, want FD-1", prev.Rows[0][0])
 	}
 
 	if _, err := svc.PreviewReport(api.ReportRequest{Kind: "NOPE"}); !errors.Is(err, domain.ErrInvalidReport) {
@@ -112,7 +111,6 @@ func TestMaturityChartBucketsByMonth(t *testing.T) {
 		t.Fatalf("create near: %v", err)
 	}
 	far := baseRequest()
-	far.CustomerName = "NEXT"
 	far.StartDate = "2026-09-30"
 	far.TenureDays = 60 // maturity 2026-11-29 (next month)
 	if _, err := svc.Create(far); err != nil {

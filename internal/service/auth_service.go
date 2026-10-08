@@ -135,6 +135,63 @@ func (s *FDService) ChangeCredentials(currentPassword, newUsername, newPassword 
 	return rec.Username, rec.RecoveryCode, nil
 }
 
+// ChangeUsername verifies the current password and replaces the username
+// (SRS §30.2: each credential card requires the current password). The
+// recovery code is regenerated so the old code no longer works.
+func (s *FDService) ChangeUsername(currentPassword, newUsername string) (string, string, error) {
+	newUsername = strings.TrimSpace(newUsername)
+	if strings.TrimSpace(currentPassword) == "" {
+		return "", "", domain.ErrCurrentPasswordRequired
+	}
+	if newUsername == "" {
+		return "", "", domain.ErrUsernameRequired
+	}
+	rec, err := s.auth.Get()
+	if err != nil {
+		return "", "", err
+	}
+	if rec == nil || rec.PasswordHash != hashPassword(currentPassword) {
+		return "", "", domain.ErrInvalidCredentials
+	}
+	rec.Username = newUsername
+	return s.saveRotatedCredentials(rec)
+}
+
+// ChangePassword verifies the current password and replaces the password
+// (SRS §30.2). The recovery code is regenerated as well.
+func (s *FDService) ChangePassword(currentPassword, newPassword string) (string, string, error) {
+	if strings.TrimSpace(currentPassword) == "" {
+		return "", "", domain.ErrCurrentPasswordRequired
+	}
+	if len(newPassword) < minPasswordLength {
+		return "", "", domain.ErrPasswordTooShort
+	}
+	rec, err := s.auth.Get()
+	if err != nil {
+		return "", "", err
+	}
+	if rec == nil || rec.PasswordHash != hashPassword(currentPassword) {
+		return "", "", domain.ErrInvalidCredentials
+	}
+	rec.PasswordHash = hashPassword(newPassword)
+	return s.saveRotatedCredentials(rec)
+}
+
+// saveRotatedCredentials issues a fresh recovery code, persists the record
+// and returns the current username and code for the recovery file.
+func (s *FDService) saveRotatedCredentials(rec *repo.AuthRecord) (string, string, error) {
+	code, err := newRecoveryCode()
+	if err != nil {
+		return "", "", err
+	}
+	rec.RecoveryCode = code
+	rec.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if err := s.auth.Save(*rec); err != nil {
+		return "", "", err
+	}
+	return rec.Username, rec.RecoveryCode, nil
+}
+
 // ResetCredentials replaces the login after the recovery code is verified.
 // A fresh recovery code is issued and returned.
 func (s *FDService) ResetCredentials(recoveryCode, newUsername, newPassword string) (string, string, error) {

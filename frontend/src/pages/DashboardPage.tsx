@@ -2,59 +2,40 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DashboardStats,
-  ListFDs,
   UpcomingMaturities,
-  fdFilters,
-  type FD,
   type UpcomingFD,
 } from "../lib/api";
 import { daysLabel, formatDate, formatMoney, formatPercent } from "../lib/format";
-import { useAsync, useDebounced } from "../lib/hooks";
+import { useAsync } from "../lib/hooks";
 import { DataTable, type Column } from "../components/data/DataTable";
-import { FilterBar } from "../components/data/FilterBar";
 import { KpiCard } from "../components/data/KpiCard";
 import { MaturityChartCard } from "../components/data/MaturityChart";
-import { PaginationBar } from "../components/data/PaginationBar";
 import { Card, CardBody, CardHead } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/FormField";
 import { ErrorState, Loading } from "../components/ui/States";
 import { PageHeader } from "../components/ui/PageHeader";
 import { StatusBadge } from "../components/ui/Badge";
+import { Icon } from "../lib/icons";
 
-const PAGE_SIZE = 25;
-
+/** Overview screen: quick search, quick actions, KPIs and maturity data (SRS §9.1). */
 export function DashboardPage() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<(typeof fdFilters)[number]["value"]>("ALL");
-  const [page, setPage] = useState(1);
-  const debouncedSearch = useDebounced(search, 300);
+  const [query, setQuery] = useState("");
 
   const stats = useAsync(() => DashboardStats(), []);
   const upcoming = useAsync(() => UpcomingMaturities({ fromDate: "", toDate: "" }), []);
-  const list = useAsync(
-    () => ListFDs({ search: debouncedSearch, filter, page, pageSize: PAGE_SIZE }),
-    [debouncedSearch, filter, page],
-  );
 
-  const columns = useMemo<Array<Column<FD>>>(
-    () => [
-      { key: "fdNumber", header: "FD Number", mono: true, render: (r) => r.fdNumber },
-      { key: "customer", header: "Customer/Member", render: (r) => r.customerName },
-      { key: "principal", header: "Deposit Amount", numeric: true, render: (r) => formatMoney(r.principal) },
-      { key: "rate", header: "Interest Rate", numeric: true, render: (r) => formatPercent(r.interestRate) },
-      { key: "start", header: "Start Date", render: (r) => formatDate(r.startDate) },
-      { key: "maturity", header: "Maturity Date", render: (r) => formatDate(r.maturityDate) },
-      { key: "maturityAmount", header: "Maturity Amount", numeric: true, render: (r) => formatMoney(r.maturityAmount) },
-      { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} detail={r.closureType} /> },
-    ],
-    [],
-  );
+  // Enter hands the quick-search query to the FD Master page (SRS §9.1).
+  const openFDMaster = () => {
+    const q = query.trim();
+    navigate(q ? `/fds?q=${encodeURIComponent(q)}` : "/fds");
+  };
 
   const upcomingColumns = useMemo<Array<Column<UpcomingFD>>>(
     () => [
       { key: "fdNumber", header: "FD Number", mono: true, render: (r) => r.fdNumber },
-      { key: "customer", header: "Customer/Member", render: (r) => r.customerName },
+      { key: "customer", header: "Member Name", render: (r) => r.customerName },
       { key: "principal", header: "Principal", numeric: true, render: (r) => formatMoney(r.principal) },
       { key: "maturityDate", header: "Maturity Date", render: (r) => formatDate(r.maturityDate) },
       { key: "days", header: "Days Remaining", numeric: true, render: (r) => daysLabel(r.daysRemaining) },
@@ -65,15 +46,52 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        context="All Fixed Deposits — search, filter and manage"
-        actions={
-          <Button variant="primary" icon="plus" onClick={() => navigate("/new")}>
-            Create New FD
-          </Button>
-        }
-      />
+      <PageHeader title="Dashboard" context="Overview — KPIs, maturity chart, upcoming maturities and quick actions" />
+
+      {/* Quick search sits between the header and the action buttons (SRS §9.1). */}
+      <div className="hs-filter-bar">
+        <div className="hs-filter-bar__search">
+          <div style={{ position: "relative" }}>
+            <span
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--color-text-muted)",
+                display: "flex",
+              }}
+            >
+              <Icon name="search" size={15} />
+            </span>
+            <Input
+              type="search"
+              value={query}
+              placeholder="Quick search FDs — press Enter to open results…"
+              aria-label="Quick search"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openFDMaster();
+              }}
+              style={{ paddingInlineStart: 32 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Quick actions shown side by side, directly under the search (SRS §9.1). */}
+      <div className="u-row u-gap-2 u-mb-4">
+        <Button variant="primary" icon="plus" onClick={() => navigate("/member/new")}>
+          New Member
+        </Button>
+        <Button variant="secondary" icon="plus" onClick={() => navigate("/new")}>
+          Create New FD
+        </Button>
+        <Button variant="ghost" icon="sheet" onClick={() => navigate("/fds")}>
+          View full FD list
+        </Button>
+      </div>
 
       {stats.loading ? (
         <Loading />
@@ -131,40 +149,6 @@ export function DashboardPage() {
           </CardBody>
         </Card>
       </div>
-
-      <div className="u-mt-5">
-        <FilterBar
-          search={search}
-          onSearchChange={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-          filters={fdFilters}
-          activeFilter={filter}
-          onFilterChange={(v) => {
-            setFilter(v);
-            setPage(1);
-          }}
-        />
-      </div>
-
-      <DataTable
-        columns={columns}
-        rows={list.data?.items ?? []}
-        rowKey={(r) => r.fdNumber}
-        loading={list.loading}
-        onRowClick={(r) => navigate(`/fd/${r.fdNumber}`)}
-        emptyTitle={search || filter !== "ALL" ? "No FDs match your search" : "No Fixed Deposits yet"}
-        emptyDescription={
-          search || filter !== "ALL"
-            ? "Try a different search term or filter."
-            : "Create your first Fixed Deposit to get started."
-        }
-      />
-      {!list.loading && !list.error && (list.data?.total ?? 0) > 0 && (
-        <PaginationBar page={list.data?.page ?? 1} pageSize={PAGE_SIZE} total={list.data?.total ?? 0} onPageChange={setPage} />
-      )}
-      {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
     </>
   );
 }

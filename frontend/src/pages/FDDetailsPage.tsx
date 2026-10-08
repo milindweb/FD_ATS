@@ -117,8 +117,8 @@ export function FDDetailsPage() {
         context={`${fd.customerName}${fd.customerNumber ? ` · ${fd.customerNumber}` : ""}`}
         actions={
           <>
-            <Button icon="arrow-left" onClick={() => navigate("/")}>
-              Back to Dashboard
+            <Button icon="arrow-left" onClick={() => navigate("/fds")}>
+              Back to FD Master
             </Button>
             {isActive && (
               <>
@@ -183,8 +183,9 @@ export function FDDetailsPage() {
           <CardBody>
             <dl className="hs-info-grid">
               <InfoItem label="FD Number" value={fd.fdNumber} mono />
-              <InfoItem label="Customer / Member" value={fd.customerName} />
-              <InfoItem label="Customer / Member No" value={fd.customerNumber || "—"} mono />
+              <InfoItem label="Member Name" value={fd.customerName} />
+              <InfoItem label="GEN No." value={fd.customerNumber || "—"} mono />
+              <InfoItem label="FD Form No." value={fd.fdFormNo || "—"} mono />
               <InfoItem label="Deposit Amount" value={formatMoney(fd.principal)} />
               <InfoItem label="Start Date" value={formatDate(fd.startDate)} />
               <InfoItem label="Tenure" value={formatTenure(fd.tenureDays)} />

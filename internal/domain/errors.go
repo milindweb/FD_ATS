@@ -39,6 +39,14 @@ var (
 	ErrRestoreSameFile     = errors.New("Please choose a backup file other than the current database.")
 	ErrSampleDataNotEmpty  = errors.New("Sample data can only be loaded into an empty database.")
 
+	ErrGENRequired        = errors.New("Please enter the GEN No.")
+	ErrMemberNameRequired = errors.New("Please enter the member name.")
+	ErrDuplicateGEN       = errors.New("A member with this GEN No. already exists.")
+	ErrMemberNotFound     = errors.New("Member record not found.")
+	ErrMemberRequired     = errors.New("Please select an existing member.")
+	ErrImportPathRequired = errors.New("Please choose an Excel file to import.")
+	ErrNoImportableRows   = errors.New("No valid member records were found in the file.")
+
 	ErrNotAuthenticated        = errors.New("Please sign in to continue.")
 	ErrInvalidCredentials      = errors.New("Invalid username or password.")
 	ErrUsernameRequired        = errors.New("Username is required.")

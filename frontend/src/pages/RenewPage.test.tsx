@@ -14,6 +14,7 @@ import { RenewPage } from "./RenewPage";
 
 const fd = {
   fdNumber: "FD-26-001",
+  memberId: 7,
   customerName: "Asha",
   customerNumber: "M-1",
   principal: 50000,
@@ -61,6 +62,35 @@ describe("RenewPage maturity guard", () => {
     await screen.findByLabelText(/New Start Date/);
     await vi.waitFor(() => {
       expect((screen.getByLabelText(/New Start Date/) as HTMLInputElement).value).toBe("2027-06-30");
+    });
+  });
+
+  it("previews using the linked member", async () => {
+    renderRenew();
+
+    await vi.waitFor(() => {
+      expect(PreviewFD).toHaveBeenCalledWith({
+        memberId: 7,
+        fdFormNo: "",
+        principal: 52000,
+        startDate: "2027-06-30",
+        tenureDays: 1095,
+      });
+    });
+  });
+
+  it("skips the calculation preview when the FD has no linked member", async () => {
+    vi.mocked(GetFD).mockResolvedValue({
+      fd: { ...fd, memberId: undefined, maturityDate: "2026-06-30" },
+      history: [],
+    } as never);
+
+    renderRenew();
+
+    expect(await screen.findByText("Calculation preview unavailable — FD is not linked to a member")).toBeInTheDocument();
+    expect(PreviewFD).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(screen.getByRole("button", { name: "Confirm Renewal" })).toBeEnabled();
     });
   });
 

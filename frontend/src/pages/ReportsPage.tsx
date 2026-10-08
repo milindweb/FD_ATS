@@ -26,6 +26,14 @@ export function ReportsPage() {
 
   const selected = reportKinds.find((k) => k.kind === kind)!;
   const dateFiltered = kind === "REGISTER" || kind === "MATURITY";
+  const noRangeNote =
+    kind === "MEMBERS"
+      ? `The ${selected.label} covers every member with active FDs — no date filter applies.`
+      : `The ${selected.label} covers all ${kind === "ACTIVE" ? "active" : "closed"} FDs — no date filter applies.`;
+  const columnNote =
+    kind === "MEMBERS"
+      ? "GEN No., Member Name, Designation, Active FD Count and Total Active FD Amount — with filters enabled on the header row."
+      : "FD Number, Member Name, GEN No., Principal, Rate, Start, Maturity Date, Interest, Maturity Amount, Status and Closure details — with filters enabled on the header row.";
 
   const preview = useAsync(
     () => PreviewReport({ kind, fromDate, toDate, path: "" }),
@@ -99,10 +107,7 @@ export function ReportsPage() {
                 </FormField>
               </div>
             ) : (
-              <p className="u-muted">
-                The {selected.label} covers all {kind === "ACTIVE" ? "active" : "closed"} FDs — no date filter
-                applies.
-              </p>
+              <p className="u-muted">{noRangeNote}</p>
             )}
 
             <div className="u-mt-4">
@@ -110,10 +115,7 @@ export function ReportsPage() {
                 Export {selected.label}
               </Button>
             </div>
-            <p className="u-mt-2 u-text-xs u-muted">
-              Excel columns: FD Number, Customer, Principal, Rate, Start, Maturity Date, Interest, Maturity
-              Amount, Status and Closure details — with filters enabled on the header row.
-            </p>
+            <p className="u-mt-2 u-text-xs u-muted">Excel columns: {columnNote}</p>
           </CardBody>
         </Card>
       </div>

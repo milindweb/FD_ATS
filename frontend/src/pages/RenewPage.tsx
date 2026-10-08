@@ -32,6 +32,7 @@ export function RenewPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fd = detail.data?.fd;
+  const memberId = fd?.memberId ?? 0;
   const basePrincipal = useMemo(() => {
     if (!fd) return 0;
     return mode === "PRINCIPAL_PLUS_INTEREST" ? fd.maturityAmount : fd.principal;
@@ -42,13 +43,18 @@ export function RenewPage() {
     setStartDate(fd.maturityDate > todayISO() ? fd.maturityDate : todayISO());
   }, [fd]);
 
+  // Preview requires a linked member; legacy FDs without one skip it entirely.
   useEffect(() => {
-    if (!fd) return;
+    if (!fd || memberId <= 0) {
+      setPreview(null);
+      setPreviewError(null);
+      return;
+    }
     let cancelled = false;
     const id = setTimeout(() => {
       PreviewFD({
-        customerName: fd.customerName,
-        customerNumber: fd.customerNumber,
+        memberId,
+        fdFormNo: "",
         principal: basePrincipal,
         startDate,
         tenureDays: Number(tenureDays) || 0,
@@ -70,7 +76,7 @@ export function RenewPage() {
       cancelled = true;
       clearTimeout(id);
     };
-  }, [fd, basePrincipal, startDate, tenureDays]);
+  }, [fd, memberId, basePrincipal, startDate, tenureDays]);
 
   if (detail.loading) return <Loading />;
   if (detail.error || !fd) return <ErrorState message={detail.error || "Fixed Deposit not found."} onRetry={detail.reload} />;
@@ -211,7 +217,9 @@ export function RenewPage() {
               </div>
             </dl>
 
-            {previewError ? (
+            {memberId <= 0 ? (
+              <p className="u-mt-3 u-muted">Calculation preview unavailable — FD is not linked to a member</p>
+            ) : previewError ? (
               <Alert tone="warning">{previewError}</Alert>
             ) : preview ? (
               <dl className="hs-preview u-mt-3">
