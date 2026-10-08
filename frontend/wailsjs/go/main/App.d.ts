@@ -50,6 +50,8 @@ export function PickBackupPath():Promise<string>;
 
 export function PickMemberImportPath():Promise<string>;
 
+export function PickMemberTemplatePath():Promise<string>;
+
 export function PickReportPath(arg1:string):Promise<string>;
 
 export function PickRestorePath():Promise<string>;
@@ -79,3 +81,5 @@ export function SaveRateSlabs(arg1:api.SaveSlabsRequest):Promise<void>;
 export function SystemStatus():Promise<api.SystemStatus>;
 
 export function UpcomingMaturities(arg1:api.UpcomingRequest):Promise<Array<api.UpcomingFD>>;
+
+export function WriteMemberTemplate(arg1:string):Promise<void>;

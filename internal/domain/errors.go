@@ -46,6 +46,7 @@ var (
 	ErrMemberRequired     = errors.New("Please select an existing member.")
 	ErrImportPathRequired = errors.New("Please choose an Excel file to import.")
 	ErrNoImportableRows   = errors.New("No valid member records were found in the file.")
+	ErrTemplatePathRequired = errors.New("Please choose a location to save the template.")
 
 	ErrNotAuthenticated        = errors.New("Please sign in to continue.")
 	ErrInvalidCredentials      = errors.New("Invalid username or password.")

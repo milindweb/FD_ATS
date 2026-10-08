@@ -52,8 +52,11 @@ The **Member** navigation item is the home of everything member-related:
 - **+ Add Member** — the member form in SRS field groups (identification, personal,
   address, employment, nominee, government ID, banking, remarks). **GEN No.** and
   **Name** are required; GEN No. must be unique.
-- **Bulk Excel Upload** — pick an `.xlsx` file whose first sheet has at least the
-  columns `GEN No.` and `Name`. An **Import Preview** shows Total / Valid /
+- **Bulk Excel Upload** — the dialog shows a short guide (first row = headers,
+  mandatory `GEN No.` + `Name`, the full optional-column list, accepted DOB
+  formats) and a **Download sample template** button that saves an `.xlsx`
+  with the exact header row for you to fill in. Then pick your file: an
+  **Import Preview** shows Total / Valid /
   Duplicate GEN No. / Missing Mandatory / Invalid / Existing in System counts plus a
   row-by-row report. Nothing is saved until you press **Import**; existing GEN Nos.
   are skipped and never overwritten.

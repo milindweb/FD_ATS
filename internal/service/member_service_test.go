@@ -290,3 +290,55 @@ func TestMemberImportFileErrors(t *testing.T) {
 		t.Errorf("headers only = %v, want ErrNoImportableRows", err)
 	}
 }
+
+// TestWriteMemberTemplate pins the sample template to the SRS §52.1/§52.2
+// column contract: the exact canonical header row, headers only (no data
+// rows), on a sheet the importer will read.
+func TestWriteMemberTemplate(t *testing.T) {
+	svc, _ := newMemberService(t)
+
+	path := filepath.Join(t.TempDir(), "template.xlsx")
+	if err := svc.WriteMemberTemplate(path); err != nil {
+		t.Fatalf("write template: %v", err)
+	}
+
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatalf("open template: %v", err)
+	}
+	defer f.Close()
+
+	sheet := f.GetSheetName(0)
+	if sheet != "Members" {
+		t.Errorf("sheet = %q, want Members", sheet)
+	}
+	rows, err := f.GetRows(sheet)
+	if err != nil {
+		t.Fatalf("read rows: %v", err)
+	}
+	want := []string{
+		"GEN No.", "Name", "DOB", "Mobile", "Email", "Present Address",
+		"Permanent Address", "Employer Name", "Department", "Designation",
+		"Token No.", "Nominee Name", "Nominee Relationship", "Aadhaar", "PAN",
+		"Bank Name", "Account No.", "IFSC Code", "Profile Remarks",
+	}
+	if len(rows) != 1 {
+		t.Errorf("row count = %d, want 1 (headers only)", len(rows))
+	}
+	if len(rows) > 0 {
+		got := rows[0]
+		if len(got) != len(want) {
+			t.Errorf("header count = %d, want %d: %v", len(got), len(want), got)
+		}
+		for i := range want {
+			if i >= len(got) || got[i] != want[i] {
+				t.Errorf("header[%d] = %q, want %q", i, got[i], want[i])
+			}
+		}
+	}
+
+	// The template must round-trip through the importer's header parser.
+	if _, err := importHeaderColumns(rows[0]); err != nil {
+		t.Errorf("header parser rejected template: %v", err)
+	}
+}

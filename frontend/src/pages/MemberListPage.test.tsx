@@ -39,6 +39,8 @@ vi.mock("../../wailsjs/go/main/App", () => ({
     pageSize: 25,
   }),
   PickMemberImportPath: vi.fn().mockResolvedValue(""),
+  PickMemberTemplatePath: vi.fn().mockResolvedValue(""),
+  WriteMemberTemplate: vi.fn().mockResolvedValue(undefined),
   PreviewMemberImport: vi.fn().mockResolvedValue({
     total: 0,
     valid: 0,
@@ -51,7 +53,7 @@ vi.mock("../../wailsjs/go/main/App", () => ({
   CommitMemberImport: vi.fn().mockResolvedValue({ imported: 0, skipped: 0, total: 0 }),
 }));
 
-import { ListMembers } from "../../wailsjs/go/main/App";
+import { ListMembers, PickMemberTemplatePath, WriteMemberTemplate } from "../../wailsjs/go/main/App";
 import { MemberListPage } from "./MemberListPage";
 
 function renderMembers() {
@@ -97,5 +99,35 @@ describe("MemberListPage", () => {
     await vi.waitFor(() => {
       expect(ListMembers).toHaveBeenCalledWith({ search: "asha", page: 1, pageSize: 25 });
     });
+  });
+
+  it("shows the upload guide and downloads the sample template (SRS §52.5)", async () => {
+    renderMembers();
+    await userEvent.click(await screen.findByText("Bulk Excel Upload"));
+
+    expect(await screen.findByText("Mandatory columns:")).toBeInTheDocument();
+    expect(screen.getByText(/Download sample template/)).toBeInTheDocument();
+
+    vi.mocked(PickMemberTemplatePath).mockResolvedValue("C:\\tmp\\Member_Import_Template.xlsx");
+    await userEvent.click(screen.getByText("Download sample template"));
+
+    await vi.waitFor(() => {
+      expect(WriteMemberTemplate).toHaveBeenCalledWith("C:\\tmp\\Member_Import_Template.xlsx");
+    });
+    expect(await screen.findByText(/Member_Import_Template\.xlsx/)).toBeInTheDocument();
+  });
+
+  it("does not write a template when the save dialog is cancelled", async () => {
+    renderMembers();
+    await userEvent.click(await screen.findByText("Bulk Excel Upload"));
+
+    vi.mocked(PickMemberTemplatePath).mockResolvedValue("");
+    await userEvent.click(await screen.findByText("Download sample template"));
+
+    await vi.waitFor(() => {
+      expect(PickMemberTemplatePath).toHaveBeenCalled();
+    });
+    expect(WriteMemberTemplate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Sample template saved/)).not.toBeInTheDocument();
   });
 });

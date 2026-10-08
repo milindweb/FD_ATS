@@ -94,6 +94,10 @@ export function PickMemberImportPath() {
   return window['go']['main']['App']['PickMemberImportPath']();
 }
 
+export function PickMemberTemplatePath() {
+  return window['go']['main']['App']['PickMemberTemplatePath']();
+}
+
 export function PickReportPath(arg1) {
   return window['go']['main']['App']['PickReportPath'](arg1);
 }
@@ -152,4 +156,8 @@ export function SystemStatus() {
 
 export function UpcomingMaturities(arg1) {
   return window['go']['main']['App']['UpcomingMaturities'](arg1);
+}
+
+export function WriteMemberTemplate(arg1) {
+  return window['go']['main']['App']['WriteMemberTemplate'](arg1);
 }

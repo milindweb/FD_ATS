@@ -395,6 +395,68 @@ func (s *MemberService) existingGENs() (map[string]bool, error) {
 	return set, rows.Err()
 }
 
+// importTemplateHeaders is the canonical sample-template header row: the
+// mandatory columns of SRS §52.1 followed by the optional columns of §52.2.
+var importTemplateHeaders = []string{
+	"GEN No.", "Name",
+	"DOB", "Mobile", "Email", "Present Address", "Permanent Address",
+	"Employer Name", "Department", "Designation", "Token No.", "Nominee Name",
+	"Nominee Relationship", "Aadhaar", "PAN", "Bank Name", "Account No.",
+	"IFSC Code", "Profile Remarks",
+}
+
+// WriteMemberTemplate writes an Excel sample file containing only the
+// canonical header row, so the user can fill it with real member records
+// (SRS §52.5). No data rows are written — the template itself must never
+// import a placeholder member.
+func (s *MemberService) WriteMemberTemplate(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return domain.ErrTemplatePathRequired
+	}
+	f := excelize.NewFile()
+	defer f.Close()
+
+	const sheet = "Members"
+	if err := f.SetSheetName("Sheet1", sheet); err != nil {
+		return err
+	}
+	headerStyle, err := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
+	if err != nil {
+		return err
+	}
+	for i, h := range importTemplateHeaders {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		if err := f.SetCellStr(sheet, cell, h); err != nil {
+			return err
+		}
+	}
+	lastCol, _ := excelize.ColumnNumberToName(len(importTemplateHeaders))
+	if err := f.SetCellStyle(sheet, "A1", lastCol+"1", headerStyle); err != nil {
+		return err
+	}
+	if err := f.AutoFilter(sheet, "A1:"+lastCol+"1", nil); err != nil {
+		return err
+	}
+	for i := 1; i <= len(importTemplateHeaders); i++ {
+		col, _ := excelize.ColumnNumberToName(i)
+		width := float64(len(importTemplateHeaders[i-1]) + 4)
+		if width < 12 {
+			width = 12
+		}
+		if err := f.SetColWidth(sheet, col, col, width); err != nil {
+			return err
+		}
+	}
+	if err := f.SetPanes(sheet, &excelize.Panes{
+		Freeze:      true,
+		YSplit:      1,
+		TopLeftCell: "A2",
+	}); err != nil {
+		return err
+	}
+	return f.SaveAs(path)
+}
+
 // importHeaderAliases maps normalized header text (lowercased, with spaces,
 // dots, underscores and hyphens removed) to import field keys. Headers come
 // straight from user files, so common spellings are accepted.

@@ -552,3 +552,32 @@ func (a *App) PickMemberImportPath() (string, error) {
 	}
 	return path, nil
 }
+
+// PickMemberTemplatePath opens the native save dialog so the user chooses
+// where the sample member template is written. An empty string means the
+// dialog was cancelled.
+func (a *App) PickMemberTemplatePath() (string, error) {
+	if a.ctx == nil {
+		return "", domain.ErrInternal
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save Sample Template",
+		DefaultFilename: "Member_Import_Template.xlsx",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Excel Files (*.xlsx)", Pattern: "*.xlsx"},
+		},
+	})
+	if err != nil {
+		return "", domain.ErrInternal
+	}
+	return path, nil
+}
+
+// WriteMemberTemplate writes the sample member-import template (canonical
+// header row only) to the chosen path (SRS §52.5).
+func (a *App) WriteMemberTemplate(path string) error {
+	if err := a.ready(); err != nil {
+		return err
+	}
+	return a.service.Members().WriteMemberTemplate(path)
+}

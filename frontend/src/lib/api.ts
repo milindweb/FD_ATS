@@ -26,6 +26,7 @@ import {
   MaturityChart,
   PickBackupPath,
   PickMemberImportPath,
+  PickMemberTemplatePath,
   PickReportPath,
   PickRestorePath,
   PreviewClosure,
@@ -41,6 +42,7 @@ import {
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,
+  WriteMemberTemplate,
 } from "../../wailsjs/go/main/App";
 import type { api, brand, domain } from "../../wailsjs/go/models";
 import { api as apiModels } from "../../wailsjs/go/models";
@@ -108,6 +110,7 @@ export {
   MaturityChart,
   PickBackupPath,
   PickMemberImportPath,
+  PickMemberTemplatePath,
   PickReportPath,
   PickRestorePath,
   PreviewClosure,
@@ -123,6 +126,7 @@ export {
   SaveRateSlabs,
   SystemStatus,
   UpcomingMaturities,
+  WriteMemberTemplate,
 };
 
 /** Extracts a user-facing message from any thrown value (SRS §40). */

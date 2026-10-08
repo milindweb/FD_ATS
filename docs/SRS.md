@@ -1689,6 +1689,23 @@ If a GEN No. already exists:
 
 An explicit "Update Existing Members" option may be added in a future version.
 
+## 52.5 Sample Template
+
+The Bulk Excel Upload dialog shall show a short upload guide (mandatory and
+optional columns, header-row rule, accepted date formats) and offer a
+**Download sample template** action.
+
+The template shall be an `.xlsx` file written to the location chosen in a
+native save dialog (default name `Member_Import_Template.xlsx`). It shall
+contain a single sheet `Members` whose first row is exactly the canonical
+header row: the mandatory columns of §52.1 (`GEN No.`, `Name`) followed by
+the optional columns of §52.2 in order. The header row shall be bold with an
+autofilter and a frozen first row.
+
+The template shall contain **no data rows** — the sample file itself must
+never import a placeholder member. The template is a convenience only; any
+file that follows the column contract (§52.1, §52.2) is equally accepted.
+
 ---
 
 # 53. FD–Member Relationship

@@ -4,7 +4,9 @@ import {
   CommitMemberImport,
   ListMembers,
   PickMemberImportPath,
+  PickMemberTemplatePath,
   PreviewMemberImport,
+  WriteMemberTemplate,
   errorMessage,
   type Member,
   type MemberImportPreview,
@@ -52,6 +54,8 @@ export function MemberListPage() {
   const [importResult, setImportResult] = useState<MemberImportResult | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateMsg, setTemplateMsg] = useState<string | null>(null);
 
   const columns = useMemo<Array<Column<Member>>>(
     () => [
@@ -92,6 +96,23 @@ export function MemberListPage() {
     setImportPreview(null);
     setImportResult(null);
     setImportError(null);
+    setTemplateMsg(null);
+  };
+
+  const downloadTemplate = async () => {
+    setImportError(null);
+    setTemplateMsg(null);
+    setTemplateBusy(true);
+    try {
+      const path = await PickMemberTemplatePath();
+      if (!path) return; // dialog cancelled
+      await WriteMemberTemplate(path);
+      setTemplateMsg(path);
+    } catch (err: unknown) {
+      setImportError(errorMessage(err));
+    } finally {
+      setTemplateBusy(false);
+    }
   };
 
   const chooseImportFile = async () => {
@@ -230,13 +251,43 @@ export function MemberListPage() {
 
         {importStep === "pick" && (
           <>
-            <p>
-              Upload an Excel file with member records. GEN No. and Name are mandatory columns; every
-              record is validated before anything is saved.
-            </p>
-            <div className="u-mt-4">
+            <div className="hs-prose">
+              <p>
+                Prepare an Excel file with one member per row. Nothing is saved until you review the
+                Import Preview, and existing GEN Nos. are never overwritten.
+              </p>
+              <ul>
+                <li>
+                  <strong>The first row must be column headers.</strong> Header spelling and spacing
+                  are flexible (e.g. “GEN No.”, “gen_no” and “GEN Number” all work).
+                </li>
+                <li>
+                  <strong>Mandatory columns:</strong> GEN No. (unique per member) and Name.
+                </li>
+                <li>
+                  <strong>Optional columns:</strong> DOB, Mobile, Email, Present Address, Permanent
+                  Address, Employer Name, Department, Designation, Token No., Nominee Name, Nominee
+                  Relationship, Aadhaar, PAN, Bank Name, Account No., IFSC Code, Profile Remarks.
+                </li>
+                <li>
+                  DOB accepts common formats such as <code>YYYY-MM-DD</code>, <code>DD-MM-YYYY</code>{" "}
+                  or <code>15-Jun-1990</code>.
+                </li>
+              </ul>
+            </div>
+            {templateMsg && (
+              <div className="u-mt-3">
+                <Alert tone="success" title="Sample template saved">
+                  {templateMsg} — fill it with your member records and choose it below.
+                </Alert>
+              </div>
+            )}
+            <div className="u-row u-gap-2 u-mt-4 u-flex-wrap">
               <Button variant="primary" icon="sheet" onClick={chooseImportFile} loading={importBusy}>
                 Choose Excel file…
+              </Button>
+              <Button icon="download" onClick={downloadTemplate} loading={templateBusy}>
+                Download sample template
               </Button>
             </div>
           </>
