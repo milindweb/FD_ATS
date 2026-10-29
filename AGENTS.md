@@ -42,3 +42,35 @@ This project is indexed by GitNexus as **FD_ATS** (1542 symbols, 3829 relationsh
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Superpowers + GitNexus (this repo)
+
+GitNexus supplies code intelligence, Superpowers supplies the process. Use
+them together, not as alternatives. Everything below is **on request of this
+repo's owner** and applies to every agent working in it.
+
+**Before changing behaviour**
+
+1. `brainstorming` — open-ended / new feature design only. Skip for
+   mechanical edits, small fixes, config and docs changes.
+2. `writing-plans` or `gitnexus-plan` — multi-step work gets a plan file
+   (`docs/plans/`); trivial changes do not.
+3. `impact` / `context` / `query` — always on the symbol you are about to
+   edit, before editing (see rules above). `risk: UNKNOWN` is not an
+   all-clear.
+4. `test-driven-development` for new behaviour, `systematic-debugging` for
+   bugs (graph first, then reproduce). Batch fixes, run the suite once at the
+   end.
+
+**Before claiming done or committing**
+
+- `verification-before-completion` — evidence from real command output, plus
+  `detect_changes({scope: "all"})` for a clean graph check.
+- `requesting-code-review` / `gitnexus-review` before merge.
+- Never commit, push, branch, worktree or rewrite history unless explicitly
+  asked.
+
+**Pipelines**
+
+- `/gitnexus-lfg` = plan → gate → work → review.
+- CLI fallback for any GitNexus MCP tool: `node .gitnexus/run.cjs <command> --repo .`

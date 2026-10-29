@@ -11,7 +11,7 @@ as per srs.md and design.md write code in phase wise step by step Making Modular
 **Cross-Platform Target:** Windows, macOS, Linux  
 
 **Designed by:** Aarti Tech Services  
-**Website:** https://aartitechservices.pages.dev/  
+**Website:** https://aartitechservices.com/  
 **Email:** aartitechservices@gmail.com  
 **Phone:** +91 9869787575  
 
@@ -1087,7 +1087,7 @@ Build, grow, and transform your business with modern websites, custom software, 
 
 Website:
 
-https://aartitechservices.pages.dev/
+https://aartitechservices.com/
 
 Email:
 
@@ -1526,7 +1526,7 @@ The application should avoid unnecessary complexity and focus on making Fixed De
 
 ## Website
 
-https://aartitechservices.pages.dev/
+https://aartitechservices.com/
 
 ## Contact
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { GetFD, PreviewFD, RenewFD, errorMessage, type Calculation } from "../lib/api";
 import { formatDate, formatMoney, formatPercent, formatTenure, todayISO } from "../lib/format";
+import { TENURE_PRESETS, activeTenurePreset, tenurePresetDays } from "../lib/tenure";
 import { useAsync } from "../lib/hooks";
 import { Alert } from "../components/ui/Alert";
 import { Button } from "../components/ui/Button";
@@ -24,7 +25,7 @@ export function RenewPage() {
 
   const [mode, setMode] = useState<Mode>("PRINCIPAL_PLUS_INTEREST");
   const [startDate, setStartDate] = useState(todayISO());
-  const [tenureDays, setTenureDays] = useState("1095");
+  const [tenureDays, setTenureDays] = useState(() => String(tenurePresetDays(todayISO(), 36)));
   const [remark, setRemark] = useState("");
   const [preview, setPreview] = useState<Calculation | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -40,7 +41,10 @@ export function RenewPage() {
 
   useEffect(() => {
     if (!fd) return;
-    setStartDate(fd.maturityDate > todayISO() ? fd.maturityDate : todayISO());
+    // A missed renewal must start where the previous FD ended. Defaulting to
+    // today would silently skip the period between maturity and today.
+    setStartDate(fd.maturityDate);
+    setTenureDays(String(tenurePresetDays(fd.maturityDate, 36)));
   }, [fd]);
 
   // Preview requires a linked member; legacy FDs without one skip it entirely.
@@ -98,6 +102,14 @@ export function RenewPage() {
   const notMatured = todayISO() < fd.maturityDate;
   const beforeMaturity = startDate !== "" && startDate < fd.maturityDate;
   const valid = basePrincipal > 0 && startDate !== "" && tenure > 0 && !beforeMaturity && !notMatured;
+
+  // Keep a chosen year/month preset in sync when the start date changes, so
+  // "3 years" still lands on the anniversary (1,095 or 1,096 days).
+  const changeStartDate = (value: string) => {
+    const preset = activeTenurePreset(startDate, tenureDays);
+    setStartDate(value);
+    if (preset) setTenureDays(String(tenurePresetDays(value, preset.months)));
+  };
 
   const submit = async () => {
     setError(null);
@@ -164,7 +176,7 @@ export function RenewPage() {
                   value={startDate}
                   min={fd.maturityDate}
                   invalid={beforeMaturity}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => changeStartDate(e.target.value)}
                 />
               </FormField>
 
@@ -184,16 +196,19 @@ export function RenewPage() {
               </FormField>
 
               <div className="hs-tenure-presets" role="group" aria-label="Tenure presets">
-                {[180, 365, 730, 1095].map((d) => (
-                  <Button
-                    key={d}
-                    size="sm"
-                    variant={tenureDays === String(d) ? "primary" : "secondary"}
-                    onClick={() => setTenureDays(String(d))}
-                  >
-                    {d === 180 ? "6 months" : d === 365 ? "1 year" : d === 730 ? "2 years" : "3 years"}
-                  </Button>
-                ))}
+                {TENURE_PRESETS.map((preset) => {
+                  const days = tenurePresetDays(startDate, preset.months);
+                  return (
+                    <Button
+                      key={preset.months}
+                      size="sm"
+                      variant={tenureDays === String(days) ? "primary" : "secondary"}
+                      onClick={() => setTenureDays(String(days))}
+                    >
+                      {preset.label}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           </CardBody>

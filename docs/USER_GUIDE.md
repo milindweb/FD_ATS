@@ -4,7 +4,7 @@ Offline desktop software for managing members and Fixed Deposits, with Excel rep
 This guide follows the actual application screens.
 
 > **Product:** Fixed Deposit Management · **Developer:** Aarti Tech Services
-> Website: https://aartitechservices.pages.dev/ · Email: aartitechservices@gmail.com · Phone: +91 9869787575
+> Website: https://aartitechservices.com/ · Email: aartitechservices@gmail.com · Phone: +91 9869787575
 
 ---
 

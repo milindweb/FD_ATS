@@ -8,6 +8,7 @@ import {
   type PreviewRequest,
 } from "../lib/api";
 import { formatDate, formatMoney, formatPercent, formatTenure, todayISO } from "../lib/format";
+import { TENURE_PRESETS, activeTenurePreset, tenurePresetDays } from "../lib/tenure";
 import { MemberPicker } from "../components/member/MemberPicker";
 import { Alert } from "../components/ui/Alert";
 import { Button } from "../components/ui/Button";
@@ -29,13 +30,16 @@ interface FormState {
   tenureDays: string;
 }
 
-const initialForm = (): FormState => ({
-  member: null,
-  fdFormNo: "",
-  principal: "",
-  startDate: todayISO(),
-  tenureDays: "1095",
-});
+const initialForm = (): FormState => {
+  const startDate = todayISO();
+  return {
+    member: null,
+    fdFormNo: "",
+    principal: "",
+    startDate,
+    tenureDays: String(tenurePresetDays(startDate, 36)),
+  };
+};
 
 export function NewFDPage() {
   const navigate = useNavigate();
@@ -101,6 +105,20 @@ export function NewFDPage() {
   const selectMember = (m: SelectedMember) => {
     setForm((f) => ({ ...f, member: m.id > 0 ? m : null }));
     setFieldErrors((fe) => ({ ...fe, member: undefined }));
+  };
+
+  // Keep a chosen year/month preset in sync when the start date changes, so
+  // "3 years" still lands on the anniversary (1,095 or 1,096 days).
+  const changeStartDate = (value: string) => {
+    setForm((f) => {
+      const preset = activeTenurePreset(f.startDate, f.tenureDays);
+      return {
+        ...f,
+        startDate: value,
+        tenureDays: preset ? String(tenurePresetDays(value, preset.months)) : f.tenureDays,
+      };
+    });
+    setFieldErrors((fe) => ({ ...fe, startDate: undefined }));
   };
 
   const validate = (): boolean => {
@@ -197,7 +215,7 @@ export function NewFDPage() {
                     id="fd-start"
                     type="date"
                     value={form.startDate}
-                    onChange={set("startDate")}
+                    onChange={(e) => changeStartDate(e.target.value)}
                     invalid={!!fieldErrors.startDate}
                   />
                 </FormField>
@@ -215,16 +233,19 @@ export function NewFDPage() {
                 </FormField>
 
                 <div className="hs-tenure-presets" role="group" aria-label="Tenure presets">
-                  {[180, 365, 730, 1095].map((d) => (
-                    <Button
-                      key={d}
-                      size="sm"
-                      variant={form.tenureDays === String(d) ? "primary" : "secondary"}
-                      onClick={() => setForm((f) => ({ ...f, tenureDays: String(d) }))}
-                    >
-                      {d === 180 ? "6 months" : d === 365 ? "1 year" : d === 730 ? "2 years" : "3 years"}
-                    </Button>
-                  ))}
+                  {TENURE_PRESETS.map((preset) => {
+                    const days = tenurePresetDays(form.startDate, preset.months);
+                    return (
+                      <Button
+                        key={preset.months}
+                        size="sm"
+                        variant={form.tenureDays === String(days) ? "primary" : "secondary"}
+                        onClick={() => setForm((f) => ({ ...f, tenureDays: String(days) }))}
+                      >
+                        {preset.label}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             </CardBody>

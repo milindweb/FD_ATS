@@ -9,7 +9,6 @@ vi.mock("../../wailsjs/go/main/App", () => ({
 }));
 
 import { GetFD, PreviewFD, RenewFD } from "../../wailsjs/go/main/App";
-import { todayISO } from "../lib/format";
 import { RenewPage } from "./RenewPage";
 
 const fd = {
@@ -65,6 +64,39 @@ describe("RenewPage maturity guard", () => {
     });
   });
 
+  it("defaults a past-maturity renewal to the maturity date, not today", async () => {
+    vi.mocked(GetFD).mockResolvedValue({ fd: { ...fd, maturityDate: "2023-10-01" }, history: [] } as never);
+
+    renderRenew();
+
+    await vi.waitFor(() => {
+      expect((screen.getByLabelText(/New Start Date/) as HTMLInputElement).value).toBe("2023-10-01");
+    });
+    await vi.waitFor(() => {
+      expect(PreviewFD).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: "2023-10-01", tenureDays: 1096 }),
+      );
+    });
+  });
+
+  it("keeps a year preset on the calendar anniversary when the start date changes", async () => {
+    vi.mocked(GetFD).mockResolvedValue({ fd: { ...fd, maturityDate: "2023-10-01" }, history: [] } as never);
+
+    renderRenew();
+
+    const start = await screen.findByLabelText(/New Start Date/);
+    await vi.waitFor(() => {
+      expect((start as HTMLInputElement).value).toBe("2023-10-01");
+    });
+
+    // 01-10-2023 + 3 years = 01-10-2026 = 1,096 days (2024 is a leap year).
+    expect(screen.getByLabelText(/New Tenure/)).toHaveValue(1096);
+
+    fireEvent.change(start, { target: { value: "2028-10-01" } });
+    // 01-10-2028 + 3 years = 01-10-2031 = 1,095 days (no leap day in between).
+    expect(screen.getByLabelText(/New Tenure/)).toHaveValue(1095);
+  });
+
   it("previews using the linked member", async () => {
     renderRenew();
 
@@ -74,7 +106,7 @@ describe("RenewPage maturity guard", () => {
         fdFormNo: "",
         principal: 52000,
         startDate: "2027-06-30",
-        tenureDays: 1095,
+        tenureDays: 1096,
       });
     });
   });
@@ -132,6 +164,9 @@ describe("RenewPage maturity guard", () => {
 
     await screen.findByRole("button", { name: "Confirm Renewal" });
     await vi.waitFor(() => {
+      expect((screen.getByLabelText(/New Start Date/) as HTMLInputElement).value).toBe("2026-06-30");
+    });
+    await vi.waitFor(() => {
       expect(screen.getByRole("button", { name: "Confirm Renewal" })).toBeEnabled();
     });
 
@@ -139,7 +174,7 @@ describe("RenewPage maturity guard", () => {
 
     await vi.waitFor(() => {
       expect(RenewFD).toHaveBeenCalledWith(
-        expect.objectContaining({ fdNumber: "FD-26-001", startDate: todayISO() }),
+        expect.objectContaining({ fdNumber: "FD-26-001", startDate: "2026-06-30", tenureDays: 1096 }),
       );
     });
   });

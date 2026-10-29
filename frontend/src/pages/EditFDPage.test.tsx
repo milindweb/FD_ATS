@@ -105,6 +105,25 @@ describe("EditFDPage", () => {
     });
   });
 
+  it("uses calendar days for the tenure presets", async () => {
+    renderEdit();
+
+    const start = await screen.findByLabelText(/^Start Date/);
+    await vi.waitFor(() => {
+      expect(start).toHaveValue("2026-01-01");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "3 years" }));
+    expect(screen.getByLabelText(/^Tenure \(days\)/)).toHaveValue(1096);
+
+    fireEvent.change(start, { target: { value: "2028-01-01" } });
+    // 01-01-2028 + 3 years = 01-01-2031 = 1,096 days (2028 is a leap year).
+    expect(screen.getByLabelText(/^Tenure \(days\)/)).toHaveValue(1096);
+
+    fireEvent.click(screen.getByRole("button", { name: "1 year" }));
+    expect(screen.getByLabelText(/^Tenure \(days\)/)).toHaveValue(366);
+  });
+
   it("disables save when required details are cleared", async () => {
     renderEdit();
 

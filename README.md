@@ -5,7 +5,7 @@ renewals, closures (matured and premature), maturity tracking and Excel report e
 Works fully offline. Built with **Wails + Go + React + TypeScript + SQLite** per `docs/SRS.md`
 and `docs/design.md`.
 
-> Developer: **Aarti Tech Services** — https://aartitechservices.pages.dev/
+> Developer: **Aarti Tech Services** — https://aartitechservices.com/
 
 ---
 
